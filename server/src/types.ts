@@ -19,7 +19,7 @@ export interface GameConfig {
 }
 
 export interface GameState {
-  phase: 'DISTRIBUTING' | 'VIEWING' | 'DESCRIBING' | 'VOTING' | 'VOTE_RESULT' | 'PK' | 'GAME_OVER';
+  phase: 'DISTRIBUTING' | 'VIEWING' | 'DESCRIBING' | 'VOTING' | 'VOTE_RESULT' | 'PK_ANNOUNCEMENT' | 'PK_DESCRIBING' | 'PK_VOTING' | 'GAME_OVER';
   currentTurnPlayerId?: string;
   phaseEndTime?: number;
   round: number;
@@ -27,6 +27,7 @@ export interface GameState {
   voteResult: Record<string, number>;
   winner?: 'CIVILIAN' | 'SPY' | 'BLANK';
   voteResultConfirmedPlayers?: string[];
+  pkPlayers?: string[]; // IDs of players in PK
 }
 
 export interface RoomData {

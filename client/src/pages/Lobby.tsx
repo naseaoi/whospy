@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSocket } from '../context/SocketContext';
+import { Pencil } from 'lucide-react';
 import type { GameConfig } from '../types';
 import { Modal } from '../components/Modal';
 
@@ -154,28 +155,31 @@ export const Lobby: React.FC = () => {
                         </div>
 
                         {/* Custom Words Toggle */}
-                        <label className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition cursor-pointer">
+                        <div className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition">
                             <span className="text-sm text-gray-300">自定义词语</span>
-                            <div className="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
-                                <input 
-                                    type="checkbox" 
-                                    name="toggle" 
-                                    checked={configForm.useCustomWords} 
-                                    onChange={openCustomWords}
-                                    className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out checked:translate-x-full checked:border-blue-600"
-                                />
-                                <div className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer transition-colors ${configForm.useCustomWords ? 'bg-blue-600' : 'bg-gray-700'}`}></div>
+                            
+                            <div className="flex items-center">
+                                {configForm.useCustomWords && (
+                                     <button 
+                                        onClick={() => setShowCustomWordsModal(true)}
+                                        className="mr-3 p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded-lg transition"
+                                        title={`当前: ${configForm.customWordPair?.civilian || '未设置'} / ${configForm.customWordPair?.spy || '未设置'}`}
+                                     >
+                                         <Pencil size={16} />
+                                     </button>
+                                )}
+                                <label className="relative inline-block w-12 align-middle select-none transition duration-200 ease-in cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        name="toggle" 
+                                        checked={configForm.useCustomWords} 
+                                        onChange={openCustomWords}
+                                        className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out checked:translate-x-full checked:border-blue-600"
+                                    />
+                                    <div className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer transition-colors ${configForm.useCustomWords ? 'bg-blue-600' : 'bg-gray-700'}`}></div>
+                                </label>
                             </div>
-                        </label>
-                        
-                        {configForm.useCustomWords && (
-                             <button 
-                                onClick={() => setShowCustomWordsModal(true)}
-                                className="w-full text-xs text-blue-400 underline text-center"
-                             >
-                                 编辑当前词语: {configForm.customWordPair?.civilian || '未设置'} / {configForm.customWordPair?.spy || '未设置'}
-                             </button>
-                        )}
+                        </div>
                     </div>
                 )}
                  {!showSettings && (

@@ -80,10 +80,17 @@ export const GameRoom: React.FC = () => {
                             轮流发言
                          </span>
                     </div>
-                ) : phase === 'VOTING' ? (
+                ) : phase === 'PK_DESCRIBING' ? (
+                    <div className="flex items-center gap-2 text-orange-400">
+                        <span className="text-xl animate-pulse">⚔️</span>
+                         <span className={`font-bold text-sm tracking-wide ${timeLeft < 5 ? 'text-red-400' : 'text-orange-400'}`}>
+                            平票PK
+                         </span>
+                    </div>
+                ) : (phase === 'VOTING' || phase === 'PK_VOTING') ? (
                     <div className="flex items-center gap-2 text-red-400">
                         <span className="text-xl animate-bounce">🗳️</span>
-                        <span className="font-bold text-sm tracking-wide">投票处决</span>
+                        <span className="font-bold text-sm tracking-wide">{phase === 'PK_VOTING' ? 'PK 投票' : '投票处决'}</span>
                     </div>
                 ) : (
                     <span className="text-gray-400 text-sm">等待中...</span>
@@ -105,15 +112,15 @@ export const GameRoom: React.FC = () => {
         </div>
       </div>
 
-      {/* Timer Progress Bar */}
-      {(phase === 'DESCRIBING' || phase === 'VIEWING') && (
-        <div className="w-full max-w-md mb-6 h-3 bg-gray-800 rounded-full overflow-hidden shadow-lg border border-gray-700">
-            <div 
-                className={`h-full transition-all duration-100 ease-linear rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)] ${phase === 'DESCRIBING' && timeLeft < 5 ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-blue-500'}`}
-                style={{ width: `${(timeLeft / (phase === 'VIEWING' ? 15 : 10)) * 100}%` }}
-            ></div>
-        </div>
-      )}
+       {/* Timer Progress Bar */}
+       {(phase === 'DESCRIBING' || phase === 'VIEWING' || phase === 'PK_DESCRIBING' || phase === 'PK_ANNOUNCEMENT') && (
+         <div className="w-full max-w-md mb-6 h-3 bg-gray-800 rounded-full overflow-hidden shadow-lg border border-gray-700">
+             <div 
+                 className={`h-full transition-all duration-100 ease-linear rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)] ${phase.includes('DESCRIBING') && timeLeft < 5 ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-blue-500'}`}
+                 style={{ width: `${(timeLeft / (phase === 'VIEWING' ? 15 : (phase === 'PK_ANNOUNCEMENT' ? 5 : 10))) * 100}%` }}
+             ></div>
+         </div>
+       )}
 
       {/* 核心交互区 */}
       <div className="w-full max-w-md mb-8 px-2">
@@ -135,7 +142,7 @@ export const GameRoom: React.FC = () => {
                   >
                       <div className="text-sm text-gray-500 font-bold uppercase tracking-widest mb-2">Your Word</div>
                       <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600">
-                        {word || "白板"}
+                        {word || "你是白板"}
                       </div>
                       <div className="text-xs mt-6 text-gray-400 font-medium">(点击隐藏)</div>
                   </div>
@@ -167,7 +174,7 @@ export const GameRoom: React.FC = () => {
                         >
                              <div className="text-xs text-gray-400 mb-1">点击查看底牌</div>
                              <div className="text-xl font-bold text-gray-600">
-                                 {showWordModal ? <span className="text-white">{word}</span> : '████'}
+                                 {showWordModal ? <span className="text-white">{word || "你是白板"}</span> : '████'}
                              </div>
                         </div>
 
@@ -184,6 +191,42 @@ export const GameRoom: React.FC = () => {
                     </div>
                 )}
             </div>
+        ) : phase === 'PK_DESCRIBING' ? (
+             <div className="relative p-6 rounded-2xl text-center transition-all duration-500 bg-gray-800/50 border-2 border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.3)]">
+                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gray-900 px-4 py-1 rounded-full text-xs text-orange-400 border border-orange-500">
+                   ⚔️ PK 发言中
+                 </div>
+
+                 <div className="mt-4 mb-2 flex flex-col items-center">
+                    {/* 座位号 */}
+                    <div className="mb-3 text-sm font-mono text-orange-300 border border-orange-500/30 inline-block px-3 py-1 rounded-full bg-orange-900/20 shadow-sm">
+                        Seat {room.players.findIndex(p => p.id === currentTurnPlayer?.id) + 1}
+                    </div>
+                    
+                    {/* 头像 */}
+                    <div className="text-7xl mb-3 animate-pulse inline-block filter drop-shadow-[0_0_10px_rgba(249,115,22,0.5)] transform hover:scale-110 transition-transform duration-300">
+                      {currentTurnPlayer?.avatar}
+                    </div>
+                    
+                    {/* 昵称 */}
+                    <div className="text-2xl font-black tracking-wide text-orange-50">{currentTurnPlayer?.name}</div>
+                 </div>
+
+                 {isMyTurn ? (
+                     <div className="animate-fade-in-up">
+                         <button 
+                             onClick={finishTurn}
+                             className="w-full mt-6 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg transform transition active:scale-95 border-b-4 border-orange-800 active:border-b-0 active:translate-y-1"
+                         >
+                             结束发言
+                         </button>
+                     </div>
+                 ) : (
+                     <div className="text-orange-400/80 text-sm mt-6 font-medium animate-pulse">
+                         请认真倾听 PK 陈述...
+                     </div>
+                 )}
+             </div>
         ) : phase === 'VOTING' ? (
              <div className="bg-gradient-to-br from-red-900/80 to-gray-900 p-6 rounded-2xl text-center border-2 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.2)]">
                 <h3 className="text-2xl font-black text-red-400 mb-2 tracking-tight">🚨 投票处决 🚨</h3>
@@ -202,7 +245,7 @@ export const GameRoom: React.FC = () => {
         {room.players.map((p, index) => {
           const isCurrent = p.id === room.gameState?.currentTurnPlayerId;
           const isMe = p.id === me?.id;
-          const isVotable = phase === 'VOTING' && p.isAlive && !isMe && !me?.votedFor && me?.isAlive;
+          const isVotable = ((phase === 'VOTING' || (phase === 'PK_VOTING' && room.gameState?.pkPlayers?.includes(p.id))) && p.isAlive && !isMe && !me?.votedFor && me?.isAlive) || false;
 
           return (
             <div 
@@ -216,6 +259,7 @@ export const GameRoom: React.FC = () => {
                             : 'bg-gray-800 border-gray-700/50 hover:bg-gray-750'}
                     ${isVotable ? 'cursor-pointer ring-2 ring-red-500/50 hover:bg-red-900/20 hover:scale-105' : ''}
                     ${isMe ? 'ring-1 ring-blue-500/30 bg-blue-900/10' : ''}
+                    ${(phase === 'PK_DESCRIBING' || phase === 'PK_VOTING') && room.gameState?.pkPlayers?.includes(p.id) ? 'border-orange-500/50 shadow-[0_0_10px_rgba(249,115,22,0.3)]' : ((phase === 'PK_DESCRIBING' || phase === 'PK_VOTING') ? 'opacity-60' : '')}
                 `}
                 onClick={() => isVotable && handleVoteClick(p.id)}
             >
@@ -226,6 +270,11 @@ export const GameRoom: React.FC = () => {
 
                 {/* Status Badges */}
                 {isMe && <div className="absolute -bottom-1.5 -right-1 bg-blue-600 text-[8px] px-1.5 py-0 rounded-full shadow border border-blue-400 z-30 font-bold tracking-tighter">YOU</div>}
+                
+                {/* PK Badge */}
+                {room.gameState?.pkPlayers?.includes(p.id) && (phase === 'PK_DESCRIBING' || phase === 'PK_VOTING' || phase === 'VOTE_RESULT') && (
+                    <div className="absolute -top-2 -right-1 bg-orange-600 text-[9px] px-1.5 py-0.5 rounded shadow z-30 font-bold animate-pulse">PK</div>
+                )}
                 <div className="relative">
                     <div className="text-3xl filter drop-shadow-sm">{p.avatar}</div>
                     {!p.isAlive && (
@@ -265,6 +314,35 @@ export const GameRoom: React.FC = () => {
         </div>
       </Modal>
 
+      {/* PK Announcement Modal */}
+      <Modal
+        isOpen={phase === 'PK_ANNOUNCEMENT' && me?.isAlive === true}
+        onClose={() => {}}
+        title="平票PK"
+        confirmText={`即将开始 (${Math.floor(timeLeft)}s)`}
+        onConfirm={() => {}}
+      >
+          <div className="text-center py-4">
+              <div className="text-5xl mb-4 animate-bounce">⚔️</div>
+              <h2 className="text-2xl font-bold text-orange-400 mb-2">出现平票！</h2>
+              <p className="text-gray-300 mb-4">
+                  即将进入PK环节，由平票玩家再次发言。
+              </p>
+              
+              <div className="flex justify-center space-x-4">
+                  {room.gameState.pkPlayers?.map(id => {
+                      const p = room.players.find(player => player.id === id);
+                      return (
+                          <div key={id} className="flex flex-col items-center">
+                              <div className="text-3xl mb-1">{p?.avatar}</div>
+                              <div className="text-xs text-gray-400">{p?.name}</div>
+                          </div>
+                      )
+                  })}
+              </div>
+          </div>
+      </Modal>
+
       {/* Vote Result Modal (For all alive players to confirm) */}
       <Modal
         isOpen={phase === 'VOTE_RESULT' && me?.isAlive === true}
@@ -300,7 +378,7 @@ export const GameRoom: React.FC = () => {
                   {room.gameState.winner === 'CIVILIAN' ? '👮' : room.gameState.winner === 'SPY' ? '🕵️‍♂️' : '🤝'}
               </div>
               <h2 className="text-3xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">
-                  {room.gameState.winner === 'CIVILIAN' ? '平民胜利' : room.gameState.winner === 'SPY' ? '卧底胜利' : '平局'}
+                  {room.gameState.winner === 'CIVILIAN' ? '平民胜利' : room.gameState.winner === 'SPY' ? '卧底胜利' : room.gameState.winner === 'BLANK' ? '白板胜利' : '平局'}
               </h2>
               <div className="mt-4 p-3 bg-gray-800 rounded-lg text-left text-sm space-y-1">
                   <div className="flex justify-between border-b border-gray-700 pb-1 mb-1">
@@ -313,7 +391,7 @@ export const GameRoom: React.FC = () => {
                   </div>
                   
                   <div className="pt-2 border-t border-gray-700">
-                      <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2">
+                      <div className="grid grid-cols-2 gap-2 p-2 custom-scrollbar overflow-y-auto" style={{ maxHeight: '15rem' }}>
                           {room.players.map(p => (
                               <div key={p.id} className={`flex items-center justify-between bg-gray-700/50 p-2 rounded ${p.id === me?.id ? 'border-2 border-blue-500 bg-blue-900/20' : ''}`}>
                                   <div className="flex items-center space-x-2 truncate">

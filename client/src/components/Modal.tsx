@@ -28,7 +28,7 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Content */}
       <div className="relative bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm border border-white/10 overflow-hidden transform transition-all scale-100 animate-fade-in-up">
         {title && (
-            <div className="bg-gray-900/50 px-6 py-4 border-b border-white/5">
+            <div className="bg-gray-900/50 px-6 py-4 border-b border-white/5 text-center">
                 <h3 className="text-lg font-bold text-white">{title}</h3>
             </div>
         )}

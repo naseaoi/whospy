@@ -64,7 +64,7 @@ export const Home: React.FC = () => {
                 </div>
             </div>
             <div className="flex-1 min-w-0">
-                <div className="text-xs text-gray-400 mb-1">你的游戏身份</div>
+                <div className="text-xs text-gray-400 mb-1">你的游戏昵称</div>
                 <div 
                     className="font-bold text-lg truncate cursor-pointer hover:text-blue-400 transition flex items-center gap-1.5 group/name"
                     onClick={() => setShowEditName(true)}
