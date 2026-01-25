@@ -20,7 +20,7 @@ const io = new Server(server, {
   }
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 const roomManager = new RoomManager();
 
 // Map socketId to roomId for quick lookup
@@ -150,6 +150,6 @@ app.get(/^(?!\/socket.io).*$/, (req, res) => {
   res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 
-server.listen(port, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
