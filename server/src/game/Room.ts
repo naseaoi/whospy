@@ -67,7 +67,7 @@ export class Room {
     this.status = 'PLAYING';
     
     // Words Setup
-    if (this.config.useCustomWords && this.config.customWordPair) {
+    if (this.config.useCustomWords && this.config.customWordPair && this.config.customWordPair.civilian && this.config.customWordPair.spy) {
       this.words = { ...this.config.customWordPair, category: '自定义' };
     } else {
       this.words = getRandomWord();

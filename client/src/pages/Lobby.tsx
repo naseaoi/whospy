@@ -90,7 +90,7 @@ export const Lobby: React.FC = () => {
                         <span className="absolute -bottom-1 right-0 bg-blue-600 text-[8px] px-1.5 py-0 rounded-full shadow border border-blue-400 z-10 font-bold tracking-tighter">YOU</span>
                     )}
 
-                    <div className="text-4xl mb-2 filter drop-shadow-md transform transition hover:scale-110 duration-200 cursor-default">{player.avatar}</div>
+                    <div className="w-16 h-16 flex items-center justify-center text-4xl mb-2 filter drop-shadow-md transform transition hover:scale-110 duration-200 cursor-default bg-gray-900/40 rounded-full border border-gray-600/30 aspect-square">{player.avatar}</div>
                     <div className="text-xs font-bold truncate w-full text-center text-gray-300">{player.name}</div>
                 </div>
              );
@@ -154,20 +154,19 @@ export const Lobby: React.FC = () => {
                         </div>
 
                         {/* Custom Words Toggle */}
-                        <div className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition cursor-pointer" onClick={() => !configForm.useCustomWords && handleConfigChange('useCustomWords', true)}>
+                        <label className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition cursor-pointer">
                             <span className="text-sm text-gray-300">自定义词语</span>
                             <div className="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
                                 <input 
                                     type="checkbox" 
                                     name="toggle" 
-                                    id="toggle" 
                                     checked={configForm.useCustomWords} 
                                     onChange={openCustomWords}
                                     className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out checked:translate-x-full checked:border-blue-600"
                                 />
-                                <label htmlFor="toggle" className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer transition-colors ${configForm.useCustomWords ? 'bg-blue-600' : 'bg-gray-700'}`}></label>
+                                <div className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer transition-colors ${configForm.useCustomWords ? 'bg-blue-600' : 'bg-gray-700'}`}></div>
                             </div>
-                        </div>
+                        </label>
                         
                         {configForm.useCustomWords && (
                              <button 

@@ -20,9 +20,10 @@ export const GameRoom: React.FC = () => {
     const interval = setInterval(() => {
         const now = Date.now();
         const end = room.gameState!.phaseEndTime!;
-        const diff = Math.ceil((end - now) / 1000);
-        setTimeLeft(diff > 0 ? diff : 0);
-    }, 1000);
+        // Use more precise calculation for progress bar
+        const diffInSeconds = (end - now) / 1000;
+        setTimeLeft(diffInSeconds > 0 ? diffInSeconds : 0);
+    }, 100); // Update more frequently for smoother animation
     return () => clearInterval(interval);
   }, [room?.gameState?.phaseEndTime]);
 
@@ -54,38 +55,65 @@ export const GameRoom: React.FC = () => {
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-900 text-white p-4 font-sans selection:bg-purple-500 selection:text-white">
       {/* 顶部状态栏 - Glassmorphism */}
-      <div className="w-full max-w-md flex flex-col mb-6 bg-white/10 backdrop-blur-md rounded-2xl shadow-lg border border-white/10 overflow-hidden relative">
-        <div className="flex justify-between items-center px-4 py-3 relative z-10">
-            <div className="text-sm font-bold text-gray-300">Round <span className="text-white text-lg">{room.gameState.round}</span></div>
-            <div className="flex items-center space-x-2">
-                {phase === 'VIEWING' && (
-                    <span className="text-yellow-400 font-mono text-xl animate-pulse">
-                        👀 记忆
-                    </span>
-                )}
-                {phase === 'DESCRIBING' && (
-                    <span className={`font-mono text-xl flex items-center gap-2 ${timeLeft < 5 ? 'text-red-500 animate-pulse' : 'text-blue-400'}`}>
-                    ⏳ 发言
-                    </span>
-                )}
-                {phase === 'VOTING' && (
-                    <span className="text-red-400 font-bold text-sm">
-                    还差 {remainingVotes} 人未投票
-                    </span>
-                )}
+      <div className="w-full max-w-md flex flex-col mb-4">
+        {/* Round Badge */}
+        <div className="flex justify-center mb-2">
+            <div className="bg-black/40 backdrop-blur-md px-4 py-1 rounded-full border border-white/10 shadow-lg flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Round</span>
+                <span className="text-white text-lg font-sans font-bold leading-none">{room.gameState.round}</span>
             </div>
         </div>
-        
-        {/* Timer Progress Bar */}
-        {(phase === 'DESCRIBING' || phase === 'VIEWING') && (
-            <div className="absolute bottom-0 left-0 w-full h-1 bg-gray-700">
-                <div 
-                    className={`h-full transition-all duration-1000 ease-linear ${phase === 'DESCRIBING' && timeLeft < 5 ? 'bg-red-500' : 'bg-blue-500'}`}
-                    style={{ width: `${(timeLeft / (phase === 'VIEWING' ? 15 : 10)) * 100}%` }}
-                ></div>
-            </div>
-        )}
+
+        {/* Phase Status Bar */}
+        <div className="flex items-center justify-between bg-gray-800/80 backdrop-blur-md rounded-2xl p-2 border border-white/5 shadow-xl">
+             {/* Left Status */}
+             <div className="flex-1 flex justify-center border-r border-white/5">
+                {phase === 'VIEWING' ? (
+                     <div className="flex items-center gap-2 text-yellow-400">
+                        <span className="text-xl">👀</span>
+                        <span className="font-bold text-sm tracking-wide">记忆词语</span>
+                     </div>
+                ) : phase === 'DESCRIBING' ? (
+                    <div className="flex items-center gap-2">
+                        <span className="text-xl animate-pulse">🎤</span>
+                         <span className={`font-bold text-sm tracking-wide ${timeLeft < 5 ? 'text-red-400' : 'text-blue-400'}`}>
+                            轮流发言
+                         </span>
+                    </div>
+                ) : phase === 'VOTING' ? (
+                    <div className="flex items-center gap-2 text-red-400">
+                        <span className="text-xl animate-bounce">🗳️</span>
+                        <span className="font-bold text-sm tracking-wide">投票处决</span>
+                    </div>
+                ) : (
+                    <span className="text-gray-400 text-sm">等待中...</span>
+                )}
+             </div>
+
+             {/* Right Status (Votes or other info) */}
+             <div className="flex-1 flex justify-center">
+                 {phase === 'VOTING' ? (
+                      <div className="text-xs text-gray-400 font-medium">
+                          还差 <span className="text-white font-bold text-base mx-1">{remainingVotes}</span> 人
+                      </div>
+                 ) : (
+                     <div className="text-xs text-gray-500 font-medium">
+                         {alivePlayers.length} 人存活
+                     </div>
+                 )}
+             </div>
+        </div>
       </div>
+
+      {/* Timer Progress Bar */}
+      {(phase === 'DESCRIBING' || phase === 'VIEWING') && (
+        <div className="w-full max-w-md mb-6 h-3 bg-gray-800 rounded-full overflow-hidden shadow-lg border border-gray-700">
+            <div 
+                className={`h-full transition-all duration-100 ease-linear rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)] ${phase === 'DESCRIBING' && timeLeft < 5 ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-blue-500'}`}
+                style={{ width: `${(timeLeft / (phase === 'VIEWING' ? 15 : 10)) * 100}%` }}
+            ></div>
+        </div>
+      )}
 
       {/* 核心交互区 */}
       <div className="w-full max-w-md mb-8 px-2">
@@ -285,14 +313,14 @@ export const GameRoom: React.FC = () => {
                   </div>
                   
                   <div className="pt-2 border-t border-gray-700">
-                      <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                      <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2">
                           {room.players.map(p => (
-                              <div key={p.id} className="flex items-center justify-between bg-gray-700/50 p-2 rounded">
+                              <div key={p.id} className={`flex items-center justify-between bg-gray-700/50 p-2 rounded ${p.id === me?.id ? 'border-2 border-blue-500 bg-blue-900/20' : ''}`}>
                                   <div className="flex items-center space-x-2 truncate">
                                       <span className="text-lg">{p.avatar}</span>
                                       <span className="text-xs text-gray-300 truncate max-w-[60px]">{p.name}</span>
                                   </div>
-                                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded
+                                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded whitespace-nowrap
                                       ${p.role === 'SPY' ? 'bg-red-500/20 text-red-400' : 
                                         p.role === 'BLANK' ? 'bg-gray-500/20 text-gray-400' : 
                                         'bg-blue-500/20 text-blue-400'}`}>
