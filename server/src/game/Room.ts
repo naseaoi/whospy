@@ -18,6 +18,9 @@ export class Room {
   private timer: NodeJS.Timeout | null = null;
   private turnOrder: string[] = []; // Array of player IDs
   private currentTurnIndex: number = 0;
+  private initialPlayerCount: number = 0; // 游戏开始时的玩家数，用于胜利阈值计算
+  private tokenToPlayerId: Map<string, string> = new Map();
+  private playerIdToToken: Map<string, string> = new Map();
 
   // Constants for durations (in ms)
   private readonly DURATION_VIEWING = 15000;
@@ -26,14 +29,18 @@ export class Room {
   // Callback to emit updates to room
   private onUpdate: (roomId: string) => void;
 
-  constructor(id: string, hostId: string, hostName: string, hostAvatar: string, onUpdate: (id: string) => void) {
+  constructor(id: string, hostId: string, hostName: string, hostAvatar: string, hostToken: string, onUpdate: (id: string) => void) {
     this.id = id;
     this.hostId = hostId;
     this.onUpdate = onUpdate;
-    this.addPlayer(hostId, hostName, hostAvatar);
+    this.addPlayer(hostId, hostName, hostAvatar, hostToken);
   }
 
-  addPlayer(id: string, name: string, avatar: string): Player {
+  addPlayer(id: string, name: string, avatar: string, token: string): Player {
+    if (this.tokenToPlayerId.has(token)) {
+      throw new Error('该身份已在房间中');
+    }
+
     const player: Player = {
       id,
       name,
@@ -43,31 +50,274 @@ export class Room {
       isReady: false
     };
     this.players.push(player);
+    this.tokenToPlayerId.set(token, id);
+    this.playerIdToToken.set(id, token);
     return player;
   }
 
   removePlayer(id: string) {
-    this.players = this.players.filter(p => p.id !== id);
-    if (this.status === 'WAITING' && this.players.length > 0 && id === this.hostId) {
-      this.hostId = this.players[0].id; // Transfer host
+    const token = this.playerIdToToken.get(id);
+    if (token) {
+      this.playerIdToToken.delete(id);
+      this.tokenToPlayerId.delete(token);
     }
-    // Handle disconnect during game? For MVP, we ignore complex reconnections logic updates
+
+    const phase = this.gameState?.phase;
+    const wasCurrentTurn = this.gameState?.currentTurnPlayerId === id;
+    const isInGame = this.status === 'PLAYING' && !!this.gameState && phase !== 'GAME_OVER';
+
+    // 修正 turnOrder 删人时的 currentTurnIndex 偏移
+    const indexInTurnOrder = this.turnOrder.indexOf(id);
+    if (indexInTurnOrder !== -1) {
+      this.turnOrder.splice(indexInTurnOrder, 1);
+      // 如果被移除的玩家在当前发言者之前，索引需要回退以避免跳过下一个玩家
+      if (indexInTurnOrder < this.currentTurnIndex) {
+        this.currentTurnIndex--;
+      }
+    }
+
+    this.players = this.players.filter(p => p.id !== id);
+
+    if (this.players.length > 0 && id === this.hostId) {
+      const nextHost = this.getNextHostCandidate();
+      if (nextHost) {
+        this.hostId = nextHost.id;
+      }
+    }
+
+    if (wasCurrentTurn && this.gameState) {
+      this.gameState.currentTurnPlayerId = undefined;
+    }
+
+    if (this.gameState?.pkPlayers) {
+      this.gameState.pkPlayers = this.gameState.pkPlayers.filter(playerId => playerId !== id);
+    }
+
+    if (this.gameState?.voteResult[id] !== undefined) {
+      delete this.gameState.voteResult[id];
+    }
+
+    if (this.gameState?.voteResultConfirmedPlayers) {
+      this.gameState.voteResultConfirmedPlayers = this.gameState.voteResultConfirmedPlayers.filter(
+        playerId => playerId !== id
+      );
+    }
+
+    // 清除投给被移除玩家的票
+    this.players.forEach(player => {
+      if (player.votedFor === id) {
+        player.votedFor = undefined;
+      }
+    });
+
+    // ---- 游戏进行中的善后处理 ----
+    if (!isInGame || this.players.length === 0) {
+      return;
+    }
+
+    // 先检查胜负条件（玩家被移除可能直接触发胜负）
+    if (this.checkWinCondition()) {
+      this.clearTimer();
+      this.status = 'GAME_OVER';
+      this.gameState!.phase = 'GAME_OVER';
+      this.onUpdate(this.id);
+      return;
+    }
+
+    // 存活玩家不足以继续游戏（少于2人）
+    const aliveCount = this.players.filter(p => p.isAlive).length;
+    if (aliveCount < 2) {
+      this.clearTimer();
+      this.status = 'GAME_OVER';
+      this.gameState!.phase = 'GAME_OVER';
+      // 只剩1人且是平民阵营则平民胜
+      const lastAlive = this.players.find(p => p.isAlive);
+      if (lastAlive) {
+        this.gameState!.winner = lastAlive.role === 'SPY' ? 'SPY' : (lastAlive.role === 'BLANK' ? 'BLANK' : 'CIVILIAN');
+      }
+      this.onUpdate(this.id);
+      return;
+    }
+
+    // 根据当前阶段做善后推进
+    switch (phase) {
+      case 'DESCRIBING':
+      case 'PK_DESCRIBING':
+        // PK 阶段所有 PK 玩家被移除 → 跳过 PK，直接进入下一轮
+        if (phase === 'PK_DESCRIBING' && this.gameState!.pkPlayers && this.gameState!.pkPlayers.length <= 1) {
+          this.clearTimer();
+          this.gameState!.pkPlayers = undefined;
+          this.gameState!.phase = 'VOTE_RESULT';
+          this.gameState!.voteResultConfirmedPlayers = [];
+          this.onUpdate(this.id);
+          break;
+        }
+        // 当前发言者被移除 → 清除定时器，立即推进到下一个回合
+        if (wasCurrentTurn) {
+          this.clearTimer();
+          // 不需要 nextTurn (会 currentTurnIndex++)，因为索引已修正到正确位置
+          this.startTurn();
+        }
+        break;
+
+      case 'VOTING':
+      case 'PK_VOTING':
+        // PK 投票阶段 PK 玩家全被移除 → 跳过 PK
+        if (phase === 'PK_VOTING' && this.gameState!.pkPlayers && this.gameState!.pkPlayers.length <= 1) {
+          this.gameState!.pkPlayers = undefined;
+          this.gameState!.phase = 'VOTE_RESULT';
+          this.gameState!.voteResultConfirmedPlayers = [];
+          this.onUpdate(this.id);
+          break;
+        }
+        // 投票阶段有票被清除，重新检查是否所有在线存活玩家都已投票
+        this.tryResolveVotingIfReady();
+        break;
+
+      case 'VOTE_RESULT':
+        // 确认阶段有人被移除，重新检查是否所有在线存活玩家都已确认
+        this.tryAdvanceVoteResultIfReady();
+        break;
+
+      case 'PK_ANNOUNCEMENT':
+        // PK 公告阶段 PK 玩家全被移除 → 跳过 PK
+        if (this.gameState!.pkPlayers && this.gameState!.pkPlayers.length <= 1) {
+          this.clearTimer();
+          this.gameState!.pkPlayers = undefined;
+          this.gameState!.phase = 'VOTE_RESULT';
+          this.gameState!.voteResultConfirmedPlayers = [];
+          this.onUpdate(this.id);
+        }
+        break;
+
+      case 'VIEWING':
+        // 看词阶段不需要特殊处理，定时器会自动推进
+        break;
+    }
   }
 
   getPlayer(id: string) {
     return this.players.find(p => p.id === id);
   }
 
+  getPlayerToken(playerId: string) {
+    return this.playerIdToToken.get(playerId);
+  }
+
+  hasPlayerToken(token: string) {
+    return this.tokenToPlayerId.has(token);
+  }
+
+  isPlayerOnlineByToken(token: string) {
+    const playerId = this.tokenToPlayerId.get(token);
+    if (!playerId) {
+      return false;
+    }
+
+    const player = this.getPlayer(playerId);
+    return !!player && player.isOnline;
+  }
+
+  removePlayerByToken(token: string) {
+    const playerId = this.tokenToPlayerId.get(token);
+    if (!playerId) {
+      return;
+    }
+    this.removePlayer(playerId);
+  }
+
+  reconnectPlayer(token: string, newPlayerId: string) {
+    const oldPlayerId = this.tokenToPlayerId.get(token);
+    if (!oldPlayerId) {
+      throw new Error('玩家身份不存在');
+    }
+
+    const player = this.getPlayer(oldPlayerId);
+    if (!player) {
+      this.tokenToPlayerId.delete(token);
+      this.playerIdToToken.delete(oldPlayerId);
+      throw new Error('玩家数据异常，请重新加入房间');
+    }
+
+    if (oldPlayerId === newPlayerId) {
+      player.isOnline = true;
+      return;
+    }
+
+    player.id = newPlayerId;
+    player.isOnline = true;
+
+    this.playerIdToToken.delete(oldPlayerId);
+    this.playerIdToToken.set(newPlayerId, token);
+    this.tokenToPlayerId.set(token, newPlayerId);
+
+    if (this.hostId === oldPlayerId) {
+      this.hostId = newPlayerId;
+    }
+
+    this.turnOrder = this.turnOrder.map(playerId => (playerId === oldPlayerId ? newPlayerId : playerId));
+
+    if (this.gameState?.currentTurnPlayerId === oldPlayerId) {
+      this.gameState.currentTurnPlayerId = newPlayerId;
+    }
+
+    if (this.gameState?.pkPlayers) {
+      this.gameState.pkPlayers = this.gameState.pkPlayers.map(playerId => (playerId === oldPlayerId ? newPlayerId : playerId));
+    }
+
+    if (this.gameState?.voteResult[oldPlayerId] !== undefined) {
+      this.gameState.voteResult[newPlayerId] = this.gameState.voteResult[oldPlayerId];
+      delete this.gameState.voteResult[oldPlayerId];
+    }
+
+    this.players.forEach(currentPlayer => {
+      if (currentPlayer.votedFor === oldPlayerId) {
+        currentPlayer.votedFor = newPlayerId;
+      }
+    });
+
+    if (this.gameState?.voteResultConfirmedPlayers) {
+      this.gameState.voteResultConfirmedPlayers = this.gameState.voteResultConfirmedPlayers.map(
+        playerId => (playerId === oldPlayerId ? newPlayerId : playerId)
+      );
+    }
+  }
+
+  markPlayerOffline(playerId: string) {
+    const player = this.getPlayer(playerId);
+    if (!player) {
+      return;
+    }
+    player.isOnline = false;
+
+    if (this.gameState?.phase === 'VOTING' || this.gameState?.phase === 'PK_VOTING') {
+      this.tryResolveVotingIfReady();
+      return;
+    }
+
+    if (this.gameState?.phase === 'VOTE_RESULT') {
+      this.tryAdvanceVoteResultIfReady();
+    }
+  }
+
+  getOnlinePlayerCount() {
+    return this.players.filter(player => player.isOnline).length;
+  }
+
   updateConfig(config: Partial<GameConfig>) {
-    this.config = { ...this.config, ...config };
+    const nextConfig = { ...this.config, ...config };
+    this.validateConfig(nextConfig);
+    this.config = nextConfig;
   }
 
   startGame() {
     if (this.players.length < 3) throw new Error("人数不足");
+    this.validateConfig(this.config);
     this.status = 'PLAYING';
+    this.initialPlayerCount = this.players.length;
     
-    // Shuffle players for seat randomization
-    this.players = this.players.sort(() => Math.random() - 0.5);
+    // Fisher-Yates 洗牌（座位随机化）
+    this.shuffleArray(this.players);
 
     // Words Setup
     if (this.config.useCustomWords && this.config.customWordPair && this.config.customWordPair.civilian && this.config.customWordPair.spy) {
@@ -80,8 +330,9 @@ export class Room {
     const spies = this.config.spyCount;
     const blanks = this.config.blankCount;
     
-    // Shuffle for roles
-    const shuffledForRoles = [...this.players].map(p => p.id).sort(() => Math.random() - 0.5);
+    // Fisher-Yates 洗牌（角色分配）
+    const shuffledForRoles = this.players.map(p => p.id);
+    this.shuffleArray(shuffledForRoles);
     const spyIds = new Set(shuffledForRoles.slice(0, spies));
     const blankIds = new Set(shuffledForRoles.slice(spies, spies + blanks));
 
@@ -171,23 +422,16 @@ export class Room {
     voter.votedFor = targetId;
     
     // Check if all alive players voted
-    const alivePlayers = this.players.filter(p => p.isAlive);
-    const voteCount = alivePlayers.filter(p => p.votedFor).length;
-
-    if (voteCount >= alivePlayers.length) {
-      this.resolveVotes();
-    } else {
-        this.onUpdate(this.id);
-    }
+    this.tryResolveVotingIfReady();
   }
 
   private resolveVotes() {
     if (!this.gameState) return;
     
-    // Tally votes
+    // Tally votes - 只统计存活玩家的投票
     const votes: Record<string, number> = {};
     this.players.forEach(p => {
-        if (p.votedFor) {
+        if (p.isAlive && p.votedFor) {
             votes[p.votedFor] = (votes[p.votedFor] || 0) + 1;
         }
     });
@@ -283,21 +527,24 @@ export class Room {
               this.gameState.voteResultConfirmedPlayers.push(playerId);
           }
           
-          const alivePlayers = this.players.filter(p => p.isAlive);
-          const confirmedCount = this.gameState.voteResultConfirmedPlayers.filter(id => {
-              const p = this.getPlayer(id);
-              return p && p.isAlive;
-          }).length;
-
-          if (confirmedCount >= alivePlayers.length) {
-              this.gameState.round++;
-              this.turnOrder = this.players.map(p => p.id);
-              this.startDescribingPhase();
-          } else {
-              this.onUpdate(this.id);
-          }
+          this.tryAdvanceVoteResultIfReady();
       } 
       // Handle PK Announcement confirmation - Removed manual confirmation logic as it's now auto
+  }
+
+  transferHostToFirstOnline(): boolean {
+    const currentHost = this.getPlayer(this.hostId);
+    if (!currentHost || currentHost.isOnline) {
+      return false;
+    }
+
+    const nextHost = this.getNextHostCandidate();
+    if (!nextHost || nextHost.id === this.hostId) {
+      return false;
+    }
+
+    this.hostId = nextHost.id;
+    return true;
   }
 
   finishTurn(playerId: string) {
@@ -364,8 +611,10 @@ export class Room {
   }
 
   restartGame() {
+    this.clearTimer();
     this.status = 'WAITING';
     this.gameState = null;
+    this.initialPlayerCount = 0;
     this.players.forEach(p => {
         // p.isReady = false; // Removed readiness check for now
         p.role = undefined;
@@ -389,9 +638,8 @@ export class Room {
       }
 
       // 卧底获胜
-      // 游戏人数少于7人时，卧底在只剩2人时存活即获胜
-      // 游戏人数大于等于7人时，卧底在只剩3人时存活即获胜
-      const totalInitialPlayers = this.players.length;
+      // 使用游戏开始时的玩家数计算阈值，避免中途退出影响判定
+      const totalInitialPlayers = this.initialPlayerCount || this.players.length;
       const threshold = totalInitialPlayers < 7 ? 2 : 3;
 
       if (spies.length > 0 && totalAlive <= threshold) {
@@ -418,6 +666,129 @@ export class Room {
       clearTimeout(this.timer);
       this.timer = null;
     }
+  }
+
+  private getNextHostCandidate(): Player | undefined {
+    return this.players.find(player => player.isOnline) || this.players[0];
+  }
+
+  private getVotingParticipants(): Player[] {
+    return this.players.filter(player => player.isAlive && player.isOnline);
+  }
+
+  private tryResolveVotingIfReady() {
+    if (!this.gameState || (this.gameState.phase !== 'VOTING' && this.gameState.phase !== 'PK_VOTING')) {
+      return;
+    }
+
+    const votingParticipants = this.getVotingParticipants();
+    if (votingParticipants.length === 0) {
+      this.onUpdate(this.id);
+      return;
+    }
+
+    const voteCount = votingParticipants.filter(player => player.votedFor).length;
+    if (voteCount >= votingParticipants.length) {
+      this.resolveVotes();
+      return;
+    }
+
+    this.onUpdate(this.id);
+  }
+
+  private tryAdvanceVoteResultIfReady() {
+    if (!this.gameState || this.gameState.phase !== 'VOTE_RESULT') {
+      return;
+    }
+
+    const votingParticipants = this.getVotingParticipants();
+    if (votingParticipants.length === 0) {
+      this.onUpdate(this.id);
+      return;
+    }
+
+    const confirmedCount = (this.gameState.voteResultConfirmedPlayers || []).filter(id => {
+      const player = this.getPlayer(id);
+      return player && player.isAlive && player.isOnline;
+    }).length;
+
+    if (confirmedCount >= votingParticipants.length) {
+      this.gameState.round++;
+      this.turnOrder = this.players.map(p => p.id);
+      this.startDescribingPhase();
+      return;
+    }
+
+    this.onUpdate(this.id);
+  }
+
+  dispose() {
+    this.clearTimer();
+  }
+
+  /** Fisher-Yates 原地洗牌，保证均匀随机分布 */
+  private shuffleArray<T>(arr: T[]): void {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+
+  private validateConfig(config: GameConfig) {
+    if (!Number.isInteger(config.spyCount) || config.spyCount < 1) {
+      throw new Error('卧底人数必须是大于等于 1 的整数');
+    }
+
+    if (!Number.isInteger(config.blankCount) || config.blankCount < 0) {
+      throw new Error('白板人数必须是大于等于 0 的整数');
+    }
+
+    const maxSpecialRoles = this.players.length - 1;
+    if (config.spyCount + config.blankCount > maxSpecialRoles) {
+      throw new Error('卧底和白板总人数不能超过玩家人数减 1');
+    }
+
+    if (config.useCustomWords) {
+      const civilian = config.customWordPair?.civilian?.trim();
+      const spy = config.customWordPair?.spy?.trim();
+      if (!civilian || !spy) {
+        throw new Error('开启自定义词语时，平民词和卧底词不能为空');
+      }
+      if (civilian === spy) {
+        throw new Error('平民词和卧底词不能相同');
+      }
+    }
+  }
+
+  private toVisiblePlayer(viewerId: string, revealAll: boolean, player: Player): Player {
+    if (revealAll || player.id === viewerId) {
+      return { ...player };
+    }
+
+    return {
+      ...player,
+      role: undefined,
+      word: undefined
+    };
+  }
+
+  toDataForPlayer(viewerId: string): RoomData {
+    const revealAll = this.status === 'GAME_OVER' || this.gameState?.phase === 'GAME_OVER';
+    const safeGameState = this.gameState
+      ? {
+          ...this.gameState,
+          words: revealAll ? this.gameState.words : { civilian: '', spy: '' }
+        }
+      : null;
+
+    return {
+      id: this.id,
+      hostId: this.hostId,
+      players: this.players.map(player => this.toVisiblePlayer(viewerId, revealAll, player)),
+      status: this.status,
+      config: this.config,
+      gameState: safeGameState
+    };
   }
 
   toData(): RoomData {

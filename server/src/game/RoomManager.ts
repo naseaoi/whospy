@@ -3,23 +3,32 @@ import { Room } from './Room';
 export class RoomManager {
   private rooms: Map<string, Room> = new Map();
 
-  createRoom(hostId: string, hostName: string, hostAvatar: string, onUpdate: (id: string) => void): Room {
+  createRoom(hostId: string, hostName: string, hostAvatar: string, hostToken: string, onUpdate: (id: string) => void): Room {
     const roomId = this.generateRoomId();
-    const room = new Room(roomId, hostId, hostName, hostAvatar, onUpdate);
+    const room = new Room(roomId, hostId, hostName, hostAvatar, hostToken, onUpdate);
     this.rooms.set(roomId, room);
     return room;
   }
 
-  joinRoom(roomId: string, playerId: string, playerName: string, playerAvatar: string): Room {
+  joinRoom(roomId: string, playerId: string, playerName: string, playerAvatar: string, playerToken: string): Room {
     const room = this.rooms.get(roomId);
     if (!room) throw new Error("房间不存在");
-    if (room.status !== 'WAITING') throw new Error("游戏已开始");
-    
-    // Reconnection logic could go here, but for MVP we assume new join
-    const existing = room.getPlayer(playerId);
-    if (!existing) {
-      room.addPlayer(playerId, playerName, playerAvatar);
+
+    if (room.hasPlayerToken(playerToken)) {
+      room.reconnectPlayer(playerToken, playerId);
+      return room;
     }
+
+    if (room.status !== 'WAITING') throw new Error("游戏已开始");
+
+    room.addPlayer(playerId, playerName, playerAvatar, playerToken);
+    return room;
+  }
+
+  reconnectRoom(roomId: string, playerId: string, playerToken: string): Room {
+    const room = this.rooms.get(roomId);
+    if (!room) throw new Error("房间不存在");
+    room.reconnectPlayer(playerToken, playerId);
     return room;
   }
 
@@ -28,10 +37,21 @@ export class RoomManager {
   }
 
   deleteRoom(roomId: string) {
+    const room = this.rooms.get(roomId);
+    room?.dispose();
     this.rooms.delete(roomId);
   }
 
   private generateRoomId(): string {
-    return Math.floor(1000 + Math.random() * 9000).toString();
+    const MAX_RETRY = 20;
+
+    for (let i = 0; i < MAX_RETRY; i++) {
+      const roomId = Math.floor(100000 + Math.random() * 900000).toString();
+      if (!this.rooms.has(roomId)) {
+        return roomId;
+      }
+    }
+
+    throw new Error('房间创建过于频繁，请稍后再试');
   }
 }

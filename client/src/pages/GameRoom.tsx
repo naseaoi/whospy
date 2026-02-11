@@ -3,7 +3,7 @@ import { useSocket } from '../context/SocketContext';
 import { Modal } from '../components/Modal';
 
 export const GameRoom: React.FC = () => {
-  const { room, socket, finishTurn, vote, confirmVoteResult, restartGame } = useSocket();
+  const { room, socket, finishTurn, vote, confirmVoteResult, restartGame, leaveRoom } = useSocket();
   const [showWord, setShowWord] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   
@@ -109,7 +109,7 @@ export const GameRoom: React.FC = () => {
                      </div>
                  )}
              </div>
-        </div>
+         </div>
       </div>
 
        {/* Timer Progress Bar */}
@@ -371,7 +371,7 @@ export const GameRoom: React.FC = () => {
         confirmText={isHost ? "再来一局" : "等待房主"}
         cancelText="退出房间"
         onConfirm={() => isHost && restartGame()}
-        onClose={() => window.location.reload()} 
+        onClose={leaveRoom}
       >
           <div className="text-center py-4">
               <div className="text-6xl mb-4">
