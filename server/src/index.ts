@@ -26,6 +26,11 @@ const isOriginAllowed = (origin?: string) => {
   if (!origin) {
     return true;
   }
+  // 生产部署时（通过反代访问），如果没有手动配置 CORS_ORIGIN，
+  // 自动放行所有 origin，因为客户端由同一个 Node 进程托管
+  if (configuredOrigins.length === 0 && process.env.NODE_ENV === 'production') {
+    return true;
+  }
   return allowedOrigins.includes(origin);
 };
 
@@ -489,8 +494,8 @@ io.on('connection', (socket: Socket) => {
   });
 });
 
-// Handle SPA routing - return index.html for any unknown routes
-app.get(/^(?!\/socket.io).*$/, (req, res) => {
+// Handle SPA routing - 非 API / 非静态资源的请求返回 index.html
+app.use((req, res) => {
   res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 
