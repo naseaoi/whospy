@@ -107,7 +107,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     newSocket.on('room_notice', (notice: RoomNotice) => {
-      const noticeWithExpiry = { ...notice, expiresAt: Date.now() + 1500 };
+      const noticeWithExpiry = { ...notice, expiresAt: Date.now() + 2000 };
       setNotices(prev => {
         if (prev.some(item => item.id === notice.id)) {
           return prev;

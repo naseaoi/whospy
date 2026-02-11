@@ -209,7 +209,7 @@ io.on('connection', (socket: Socket) => {
         roomManager.deleteRoom(roomId);
       } else {
         scheduleHostTransferIfNeeded(roomId);
-        emitRoomNotice(roomId, `有玩家离线超时未重连，已自动退出。${getHostLabel(roomId)}`);
+        emitRoomNotice(roomId, `有玩家离线超时未重连，已自动退出。`);
         emitRoomUpdate(roomId);
       }
 
@@ -246,7 +246,7 @@ io.on('connection', (socket: Socket) => {
       const transferred = currentRoom.transferHostToFirstOnline();
       if (transferred) {
         const host = currentRoom.getPlayer(currentRoom.hostId);
-        emitRoomNotice(roomId, `房主已切换为 ${host?.name || '未知玩家'}。${getHostLabel(roomId)}`);
+        emitRoomNotice(roomId, `当前房主：${host?.name || '未知玩家'}`);
         emitRoomUpdate(roomId);
       }
 
@@ -479,7 +479,7 @@ io.on('connection', (socket: Socket) => {
         const playerToken = room.getPlayerToken(socket.id);
         room.markPlayerOffline(socket.id);
         if (player) {
-          emitRoomNotice(roomId, `${player.name} 掉线了。${getHostLabel(roomId)}`);
+          emitRoomNotice(roomId, `${player.name} 掉线了。`);
         }
         emitRoomUpdate(roomId);
         scheduleRoomCleanupIfOffline(roomId);
