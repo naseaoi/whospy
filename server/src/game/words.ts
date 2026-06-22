@@ -67,6 +67,9 @@ function getWordLibrary(): WordPair[] {
 
 export function getRandomWord(): WordPair {
   const library = getWordLibrary();
+  if (library.length === 0) {
+    throw new Error('词库为空，请检查 wordbank 目录');
+  }
   return library[Math.floor(Math.random() * library.length)];
 }
 

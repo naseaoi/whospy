@@ -47,6 +47,14 @@ app.use(cors({
 const clientDistPath = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientDistPath));
 
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: Date.now()
+  });
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -83,4 +91,6 @@ app.use((req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`CORS Origins: ${allowedOrigins.join(', ')}`);
 });

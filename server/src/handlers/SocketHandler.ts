@@ -18,8 +18,6 @@ export class SocketHandler {
   ) {}
 
   handleConnection(socket: Socket): void {
-    console.log('User connected:', socket.id);
-
     socket.on('create_room', (data) => this.handleCreateRoom(socket, data));
     socket.on('join_room', (data) => this.handleJoinRoom(socket, data));
     socket.on('rejoin_room', (data) => this.handleRejoinRoom(socket, data));
@@ -35,7 +33,6 @@ export class SocketHandler {
   }
 
   private handleCreateRoom(socket: Socket, { playerName, avatar, playerToken }: any): void {
-    console.log('Received create_room:', { socketId: socket.id, playerName, avatar });
     try {
       this.removeSocketFromCurrentRoom(socket);
 
@@ -236,7 +233,6 @@ export class SocketHandler {
       }
       this.socketToRoom.delete(socket.id);
     }
-    console.log('User disconnected:', socket.id);
   }
 
   private removeSocketFromCurrentRoom(socket: Socket): void {
