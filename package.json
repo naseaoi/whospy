@@ -10,9 +10,9 @@
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["whospy", "game", "websocket", "realtime"],
+  "author": "Who's Spy Team",
+  "license": "MIT",
   "devDependencies": {
     "concurrently": "^10.0.3"
   }
