@@ -3,7 +3,7 @@ import { useSocket } from '../context/SocketContext';
 import { Modal } from '../components/Modal';
 
 export const GameRoom: React.FC = () => {
-  const { room, socket, finishTurn, vote, confirmVoteResult, restartGame, leaveRoom } = useSocket();
+  const { room, socket, confirmViewing, finishTurn, vote, confirmVoteResult, restartGame, leaveRoom } = useSocket();
   const [showWord, setShowWord] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   
@@ -38,6 +38,8 @@ export const GameRoom: React.FC = () => {
   const votedCount = alivePlayers.filter(p => p.votedFor).length;
   const remainingVotes = alivePlayers.length - votedCount;
   const isHost = socket?.id === room.hostId;
+  const viewingConfirmedCount = room.gameState.viewingConfirmedPlayers?.length || 0;
+  const hasConfirmedViewing = room.gameState.viewingConfirmedPlayers?.includes(me?.id || '') || false;
 
   const handleVoteClick = (targetId: string) => {
       setShowVoteConfirm(targetId);
@@ -75,15 +77,15 @@ export const GameRoom: React.FC = () => {
                      </div>
                 ) : phase === 'DESCRIBING' ? (
                     <div className="flex items-center gap-2">
-                        <span className="text-xl animate-pulse">🎤</span>
-                         <span className={`font-bold text-sm tracking-wide ${timeLeft < 5 ? 'text-red-400' : 'text-blue-400'}`}>
+                        <span className="text-xl">🎤</span>
+                         <span className="font-bold text-sm tracking-wide text-blue-400">
                             轮流发言
                          </span>
                     </div>
                 ) : phase === 'PK_DESCRIBING' ? (
                     <div className="flex items-center gap-2 text-orange-400">
-                        <span className="text-xl animate-pulse">⚔️</span>
-                         <span className={`font-bold text-sm tracking-wide ${timeLeft < 5 ? 'text-red-400' : 'text-orange-400'}`}>
+                        <span className="text-xl">⚔️</span>
+                         <span className="font-bold text-sm tracking-wide text-orange-400">
                             平票PK
                          </span>
                     </div>
@@ -113,11 +115,11 @@ export const GameRoom: React.FC = () => {
       </div>
 
        {/* Timer Progress Bar */}
-       {(phase === 'DESCRIBING' || phase === 'VIEWING' || phase === 'PK_DESCRIBING' || phase === 'PK_ANNOUNCEMENT') && (
+       {(phase === 'PK_ANNOUNCEMENT') && (
          <div className="w-full max-w-md mb-6 h-3 bg-gray-800 rounded-full overflow-hidden shadow-lg border border-gray-700">
-             <div 
-                 className={`h-full transition-all duration-100 ease-linear rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)] ${phase.includes('DESCRIBING') && timeLeft < 5 ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-blue-500'}`}
-                 style={{ width: `${(timeLeft / (phase === 'VIEWING' ? 15 : (phase === 'PK_ANNOUNCEMENT' ? 5 : 10))) * 100}%` }}
+             <div
+                 className={`h-full transition-all duration-100 ease-linear rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)] bg-blue-500`}
+                 style={{ width: `${(timeLeft / 5) * 100}%` }}
              ></div>
          </div>
        )}
@@ -126,7 +128,7 @@ export const GameRoom: React.FC = () => {
       <div className="w-full max-w-md mb-8 px-2">
         {phase === 'VIEWING' || phase === 'DISTRIBUTING' ? (
              <div className="perspective-1000 group">
-                <div 
+                <div
                 onClick={() => setShowWord(!showWord)}
                 className={`relative w-full h-56 rounded-2xl shadow-2xl cursor-pointer transition-all duration-700 transform-style-3d ${showWord ? 'rotate-x-180' : 'hover:scale-105'}`}
                 >
@@ -134,9 +136,9 @@ export const GameRoom: React.FC = () => {
                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl flex flex-col items-center justify-center backface-hidden border border-white/20">
                       <div className="text-6xl mb-4 drop-shadow-lg">🕵️</div>
                       <div className="font-bold text-xl tracking-wider">点击查看词语</div>
-                      <div className="text-xs mt-3 text-purple-200 bg-black/20 px-3 py-1 rounded-full">15秒后自动销毁</div>
+                      <div className="text-xs mt-3 text-purple-200 bg-black/20 px-3 py-1 rounded-full">查看后点击下方按钮</div>
                   </div>
-                  
+
                   {/* Back */}
                   <div className="absolute inset-0 bg-white text-gray-900 rounded-2xl flex flex-col items-center justify-center transform rotate-x-180 backface-hidden border-4 border-purple-500"
                   >
@@ -145,6 +147,24 @@ export const GameRoom: React.FC = () => {
                         {word || "你是白板"}
                       </div>
                       <div className="text-xs mt-6 text-gray-400 font-medium">(点击隐藏)</div>
+                  </div>
+                </div>
+
+                {/* 确认按钮 */}
+                <div className="mt-6">
+                  <button
+                    onClick={confirmViewing}
+                    disabled={hasConfirmedViewing}
+                    className={`w-full font-bold py-3 px-8 rounded-xl shadow-lg transform transition border-b-4 ${
+                      hasConfirmedViewing
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed border-gray-800'
+                        : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white active:scale-95 border-green-800 active:border-b-0 active:translate-y-1'
+                    }`}
+                  >
+                    {hasConfirmedViewing ? '已确认，等待其他玩家...' : '开始游戏'}
+                  </button>
+                  <div className="text-center text-xs text-gray-400 mt-2">
+                    已确认: {viewingConfirmedCount} / {alivePlayers.length}
                   </div>
                 </div>
             </div>

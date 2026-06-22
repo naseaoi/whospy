@@ -27,6 +27,7 @@ export interface GameState {
   voteResult: Record<string, number>;
   winner?: 'CIVILIAN' | 'SPY' | 'BLANK';
   voteResultConfirmedPlayers?: string[];
+  viewingConfirmedPlayers?: string[];
   pkPlayers?: string[];
 }
 

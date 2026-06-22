@@ -22,10 +22,6 @@ export class Room {
   private tokenToPlayerId: Map<string, string> = new Map();
   private playerIdToToken: Map<string, string> = new Map();
 
-  // Constants for durations (in ms)
-  private readonly DURATION_VIEWING = 15000;
-  private readonly DURATION_DESCRIBING = 10000;
-
   // Callback to emit updates to room
   private onUpdate: (roomId: string) => void;
 
@@ -99,6 +95,12 @@ export class Room {
 
     if (this.gameState?.voteResultConfirmedPlayers) {
       this.gameState.voteResultConfirmedPlayers = this.gameState.voteResultConfirmedPlayers.filter(
+        playerId => playerId !== id
+      );
+    }
+
+    if (this.gameState?.viewingConfirmedPlayers) {
+      this.gameState.viewingConfirmedPlayers = this.gameState.viewingConfirmedPlayers.filter(
         playerId => playerId !== id
       );
     }
@@ -191,7 +193,7 @@ export class Room {
         break;
 
       case 'VIEWING':
-        // 看词阶段不需要特殊处理，定时器会自动推进
+        this.tryAdvanceViewingIfReady();
         break;
     }
   }
@@ -290,6 +292,11 @@ export class Room {
     }
     player.isOnline = false;
 
+    if (this.gameState?.phase === 'VIEWING') {
+      this.tryAdvanceViewingIfReady();
+      return;
+    }
+
     if (this.gameState?.phase === 'VOTING' || this.gameState?.phase === 'PK_VOTING') {
       this.tryResolveVotingIfReady();
       return;
@@ -369,15 +376,52 @@ export class Room {
   private startViewingPhase() {
     if (!this.gameState) return;
     this.gameState.phase = 'VIEWING';
-    const endTime = Date.now() + this.DURATION_VIEWING;
-    this.gameState.phaseEndTime = endTime;
-    
-    this.onUpdate(this.id);
+    this.gameState.phaseEndTime = undefined;
+    this.gameState.viewingConfirmedPlayers = [];
 
+    this.onUpdate(this.id);
     this.clearTimer();
-    this.timer = setTimeout(() => {
+  }
+
+  confirmViewing(playerId: string) {
+    if (!this.gameState || this.gameState.phase !== 'VIEWING') return;
+
+    const player = this.getPlayer(playerId);
+    if (!player || !player.isAlive) return;
+
+    if (!this.gameState.viewingConfirmedPlayers) {
+      this.gameState.viewingConfirmedPlayers = [];
+    }
+
+    if (!this.gameState.viewingConfirmedPlayers.includes(playerId)) {
+      this.gameState.viewingConfirmedPlayers.push(playerId);
+    }
+
+    this.tryAdvanceViewingIfReady();
+  }
+
+  private tryAdvanceViewingIfReady() {
+    if (!this.gameState || this.gameState.phase !== 'VIEWING') {
+      return;
+    }
+
+    const alivePlayers = this.players.filter(player => player.isAlive && player.isOnline);
+    if (alivePlayers.length === 0) {
+      this.onUpdate(this.id);
+      return;
+    }
+
+    const confirmedCount = (this.gameState.viewingConfirmedPlayers || []).filter(id => {
+      const player = this.getPlayer(id);
+      return player && player.isAlive && player.isOnline;
+    }).length;
+
+    if (confirmedCount >= alivePlayers.length) {
       this.startDescribingPhase();
-    }, this.DURATION_VIEWING);
+      return;
+    }
+
+    this.onUpdate(this.id);
   }
 
   private startDescribingPhase() {
@@ -562,7 +606,7 @@ export class Room {
 
   private startTurn() {
     if (!this.gameState) return;
-    
+
     // For PK_DESCRIBING, we only iterate through the reduced turnOrder (which only contains PK players)
     // For normal DESCRIBING, turnOrder contains all players, but we skip dead ones.
 
@@ -579,14 +623,8 @@ export class Room {
     // Check if phase finished
     if (this.currentTurnIndex >= this.turnOrder.length) {
       if (this.gameState.phase === 'PK_DESCRIBING') {
-          this.startVotingPhase(); // Go back to voting, but technically this is PK Voting
-          // Note: Standard voting logic handles "voting for anyone", but usually PK vote is restricted to PK targets.
-          // For simplicity/MVP: Let's assume PK vote allows voting for ANYONE or just PK targets?
-          // Rule: "进行PK投票". Usually means voting ONLY for the PK players.
-          // We should restrict voting targets in handleVote if phase is PK_VOTING.
-          // Let's create a distinct PK_VOTING phase to differentiate.
-          this.gameState.phase = 'PK_VOTING'; 
-          // Reset votes
+          this.startVotingPhase();
+          this.gameState.phase = 'PK_VOTING';
           this.players.forEach(p => p.votedFor = undefined);
           this.gameState.voteResult = {};
           this.onUpdate(this.id);
@@ -599,15 +637,10 @@ export class Room {
 
     const currentPlayerId = this.turnOrder[this.currentTurnIndex];
     this.gameState.currentTurnPlayerId = currentPlayerId;
-    const endTime = Date.now() + this.DURATION_DESCRIBING;
-    this.gameState.phaseEndTime = endTime;
+    this.gameState.phaseEndTime = undefined;
 
     this.onUpdate(this.id);
-
     this.clearTimer();
-    this.timer = setTimeout(() => {
-      this.nextTurn();
-    }, this.DURATION_DESCRIBING);
   }
 
   restartGame() {

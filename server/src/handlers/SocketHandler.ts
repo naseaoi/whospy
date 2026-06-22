@@ -24,6 +24,7 @@ export class SocketHandler {
     socket.on('join_room', (data) => this.handleJoinRoom(socket, data));
     socket.on('rejoin_room', (data) => this.handleRejoinRoom(socket, data));
     socket.on('start_game', () => this.handleStartGame(socket));
+    socket.on('confirm_viewing', () => this.handleConfirmViewing(socket));
     socket.on('finish_turn', () => this.handleFinishTurn(socket));
     socket.on('update_config', (data) => this.handleUpdateConfig(socket, data));
     socket.on('vote', (data) => this.handleVote(socket, data));
@@ -135,6 +136,16 @@ export class SocketHandler {
       }
     } catch (e: any) {
       socket.emit('error', { message: e.message });
+    }
+  }
+
+  private handleConfirmViewing(socket: Socket): void {
+    const roomId = this.socketToRoom.get(socket.id);
+    if (!roomId) return;
+    const room = this.roomManager.getRoom(roomId);
+    if (room) {
+      room.confirmViewing(socket.id);
+      this.emitRoomUpdate(roomId);
     }
   }
 

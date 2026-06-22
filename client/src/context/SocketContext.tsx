@@ -33,6 +33,7 @@ interface SocketContextType {
   joinRoom: (roomId: string, name: string, avatar: string) => void;
   startGame: () => void;
   updateConfig: (config: Partial<GameConfig>) => void;
+  confirmViewing: () => void;
   finishTurn: () => void;
   vote: (targetId: string) => void;
   confirmVoteResult: () => void;
@@ -154,6 +155,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     socket?.emit('update_config', { config });
   };
 
+  const confirmViewing = () => {
+    socket?.emit('confirm_viewing');
+  };
+
   const finishTurn = () => {
     socket?.emit('finish_turn');
   };
@@ -179,7 +184,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   return (
-    <SocketContext.Provider value={{ socket, room, isConnected, createRoom, joinRoom, startGame, updateConfig, finishTurn, vote, confirmVoteResult, restartGame, leaveRoom, notices, error }}>
+    <SocketContext.Provider value={{ socket, room, isConnected, createRoom, joinRoom, startGame, updateConfig, confirmViewing, finishTurn, vote, confirmVoteResult, restartGame, leaveRoom, notices, error }}>
       {children}
     </SocketContext.Provider>
   );

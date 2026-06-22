@@ -3,11 +3,13 @@ import { useSocket } from '../context/SocketContext';
 import { Pencil } from 'lucide-react';
 import type { GameConfig } from '../types';
 import { Modal } from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export const Lobby: React.FC = () => {
   const { room, socket, startGame, updateConfig, leaveRoom } = useSocket();
   const [showSettings, setShowSettings] = useState(false);
   const [showCustomWordsModal, setShowCustomWordsModal] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   // Local state for settings form
   const [configForm, setConfigForm] = useState<Partial<GameConfig>>({
@@ -213,11 +215,7 @@ export const Lobby: React.FC = () => {
           )}
 
           <button
-            onClick={() => {
-              if (confirm('确定要退出房间吗？')) {
-                leaveRoom();
-              }
-            }}
+            onClick={() => setShowLeaveConfirm(true)}
             className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-3 rounded-xl transition transform active:scale-95"
           >
             退出房间
@@ -257,6 +255,21 @@ export const Lobby: React.FC = () => {
               </div>
           </div>
       </Modal>
+
+      {/* Leave Room Confirmation */}
+      <ConfirmDialog
+        isOpen={showLeaveConfirm}
+        title="退出房间"
+        message="确定要退出房间吗？"
+        confirmText="确定退出"
+        cancelText="取消"
+        type="warning"
+        onConfirm={() => {
+          setShowLeaveConfirm(false);
+          leaveRoom();
+        }}
+        onCancel={() => setShowLeaveConfirm(false)}
+      />
     </div>
   );
 };
