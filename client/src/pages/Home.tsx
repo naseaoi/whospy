@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { generateRandomAvatar, generateRandomName } from '../utils/random';
 import { Modal } from '../components/Modal';
+import { Dices } from 'lucide-react';
 
 export const Home: React.FC = () => {
   const { createRoom, joinRoom, error, isConnected } = useSocket();
@@ -77,12 +78,12 @@ export const Home: React.FC = () => {
                     </div>
                 </div>
             </div>
-            <button 
+            <button
                 onClick={refreshIdentity}
                 className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-full transition"
                 title="随机换个身份"
             >
-                🎲
+                <Dices size={20} />
             </button>
         </div>
 

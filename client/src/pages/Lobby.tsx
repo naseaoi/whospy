@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSocket } from '../context/SocketContext';
-import { Pencil } from 'lucide-react';
+import { Pencil, Settings, Loader2 } from 'lucide-react';
 import type { GameConfig } from '../types';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -68,7 +68,7 @@ export const Lobby: React.FC = () => {
           </div>
           <button
             onClick={() => setShowLeaveConfirm(true)}
-            className="bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold px-3 py-1.5 rounded-lg text-xs transition"
+            className="bg-red-600/80 hover:bg-red-600 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition"
           >
             退出房间
           </button>
@@ -115,7 +115,7 @@ export const Lobby: React.FC = () => {
             <div className="bg-gray-800/50 backdrop-blur-sm p-5 rounded-2xl mb-8 border border-white/5">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-gray-300 flex items-center gap-2">
-                        <span>⚙️</span> 游戏设置
+                        <Settings size={16} /> 游戏设置
                     </h3>
                     <button 
                         onClick={() => setShowSettings(!showSettings)} 
@@ -197,7 +197,7 @@ export const Lobby: React.FC = () => {
             </div>
         ) : (
              <div className="bg-gray-800/50 p-6 rounded-2xl mb-8 text-center text-gray-500 border border-white/5 flex flex-col items-center gap-2">
-                <div className="animate-spin text-2xl">⏳</div>
+                <Loader2 className="animate-spin" size={24} />
                 等待房主设置游戏...
              </div>
         )}
