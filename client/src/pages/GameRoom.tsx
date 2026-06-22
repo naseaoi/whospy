@@ -1,12 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { Modal } from '../components/Modal';
+import { Eye, Search, Siren, Mic, Volume2 } from 'lucide-react';
 
 export const GameRoom: React.FC = () => {
   const { room, socket, confirmViewing, finishTurn, vote, confirmVoteResult, restartGame, leaveRoom } = useSocket();
   const [showWord, setShowWord] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
-  
+  const playerCardsRef = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [voteArrows, setVoteArrows] = useState<Array<{
+    voterId: string;
+    startX: number;
+    startY: number;
+    angle: number;
+    length: number;
+  }>>([]);
+
   // Modal States
   const [showVoteConfirm, setShowVoteConfirm] = useState<string | null | undefined>(undefined);
   const [showWordModal, setShowWordModal] = useState(false);
@@ -27,6 +36,87 @@ export const GameRoom: React.FC = () => {
     return () => clearInterval(interval);
   }, [room?.gameState?.phaseEndTime]);
 
+  // Calculate vote arrows
+  useEffect(() => {
+    if (room?.gameState?.phase !== 'VOTING' && room?.gameState?.phase !== 'PK_VOTING') {
+      setVoteArrows([]);
+      return;
+    }
+
+    const calculateArrows = () => {
+      const arrows: typeof voteArrows = [];
+      const mutualVotes = new Set<string>();
+
+      // 检测互投关系
+      room.players.forEach((voter) => {
+        if (!voter.votedFor || voter.votedFor === null) return;
+        const target = room.players.find(p => p.id === voter.votedFor);
+        if (target?.votedFor === voter.id) {
+          const key = [voter.id, voter.votedFor].sort().join('-');
+          mutualVotes.add(key);
+        }
+      });
+
+      room.players.forEach((voter) => {
+        if (!voter.votedFor || voter.votedFor === null) return;
+
+        const voterEl = playerCardsRef.current.get(voter.id);
+        const targetEl = playerCardsRef.current.get(voter.votedFor);
+
+        if (!voterEl || !targetEl) return;
+
+        const voterRect = voterEl.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+        const containerRect = voterEl.parentElement?.getBoundingClientRect();
+
+        if (!containerRect) return;
+
+        const mutualKey = [voter.id, voter.votedFor].sort().join('-');
+        const isMutual = mutualVotes.has(mutualKey);
+
+        let startX = voterRect.left + voterRect.width / 2 - containerRect.left;
+        let startY = voterRect.top + voterRect.height / 2 - containerRect.top;
+        let endX = targetRect.left + targetRect.width / 2 - containerRect.left;
+        let endY = targetRect.top + targetRect.height / 2 - containerRect.top;
+
+        if (isMutual) {
+          const offsetDistance = voter.id < voter.votedFor ? -20 : 20;
+          const [refId1, refId2] = [voter.id, voter.votedFor].sort();
+          const refVoterEl = playerCardsRef.current.get(refId1);
+          const refTargetEl = playerCardsRef.current.get(refId2);
+
+          if (refVoterEl && refTargetEl) {
+            const refVoterRect = refVoterEl.getBoundingClientRect();
+            const refTargetRect = refTargetEl.getBoundingClientRect();
+            const refStartX = refVoterRect.left + refVoterRect.width / 2 - containerRect.left;
+            const refStartY = refVoterRect.top + refVoterRect.height / 2 - containerRect.top;
+            const refEndX = refTargetRect.left + refTargetRect.width / 2 - containerRect.left;
+            const refEndY = refTargetRect.top + refTargetRect.height / 2 - containerRect.top;
+
+            const refAngleRad = Math.atan2(refEndY - refStartY, refEndX - refStartX);
+            const perpAngle = refAngleRad + Math.PI / 2;
+            const offsetX = Math.cos(perpAngle) * offsetDistance;
+            const offsetY = Math.sin(perpAngle) * offsetDistance;
+
+            startX += offsetX;
+            startY += offsetY;
+          }
+        }
+
+        const angle = Math.atan2(endY - startY, endX - startX) * 180 / Math.PI;
+        const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+
+        arrows.push({ voterId: voter.id, startX, startY, angle, length });
+      });
+
+      setVoteArrows(arrows);
+    };
+
+    calculateArrows();
+    const interval = setInterval(calculateArrows, 100);
+    return () => clearInterval(interval);
+  }, [room?.gameState?.phase, room?.players]);
+
   if (!room || !room.gameState) return <div>Loading...</div>;
 
   const me = room.players.find(p => p.id === socket?.id);
@@ -38,7 +128,6 @@ export const GameRoom: React.FC = () => {
   const votedCount = alivePlayers.filter(p => p.votedFor).length;
   const remainingVotes = alivePlayers.length - votedCount;
   const isHost = socket?.id === room.hostId;
-  const viewingConfirmedCount = room.gameState.viewingConfirmedPlayers?.length || 0;
   const hasConfirmedViewing = room.gameState.viewingConfirmedPlayers?.includes(me?.id || '') || false;
 
   const handleVoteClick = (targetId: string | null) => {
@@ -72,12 +161,12 @@ export const GameRoom: React.FC = () => {
              <div className="flex-1 flex justify-center border-r border-white/5">
                 {phase === 'VIEWING' ? (
                      <div className="flex items-center gap-2 text-yellow-400">
-                        <span className="text-xl">👀</span>
+                        <Eye className="w-5 h-5" />
                         <span className="font-bold text-sm tracking-wide">记忆词语</span>
                      </div>
                 ) : phase === 'DESCRIBING' ? (
                     <div className="flex items-center gap-2">
-                        <span className="text-xl">🎤</span>
+                        <Mic className="w-5 h-5 text-blue-400" />
                          <span className="font-bold text-sm tracking-wide text-blue-400">
                             轮流发言
                          </span>
@@ -91,7 +180,7 @@ export const GameRoom: React.FC = () => {
                     </div>
                 ) : (phase === 'VOTING' || phase === 'PK_VOTING') ? (
                     <div className="flex items-center gap-2 text-red-400">
-                        <span className="text-xl animate-bounce">🗳️</span>
+                        <Siren className="w-5 h-5 animate-bounce" />
                         <span className="font-bold text-sm tracking-wide">{phase === 'PK_VOTING' ? 'PK 投票' : '投票处决'}</span>
                     </div>
                 ) : (
@@ -130,11 +219,11 @@ export const GameRoom: React.FC = () => {
              <div className="perspective-1000 group">
                 <div
                 onClick={() => setShowWord(!showWord)}
-                className={`relative w-full h-56 rounded-2xl shadow-2xl cursor-pointer transition-all duration-700 transform-style-3d ${showWord ? 'rotate-x-180' : 'hover:scale-105'}`}
+                className={`relative w-full h-56 rounded-2xl shadow-2xl cursor-pointer transition-all duration-700 transform-style-3d ${showWord ? 'rotate-x-180' : ''}`}
                 >
                   {/* Front */}
                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl flex flex-col items-center justify-center backface-hidden border border-white/20">
-                      <div className="text-6xl mb-4 drop-shadow-lg">🕵️</div>
+                      <Search className="w-16 h-16 mb-4 drop-shadow-lg" />
                       <div className="font-bold text-xl tracking-wider">点击查看词语</div>
                       <div className="text-xs mt-3 text-purple-200 bg-black/20 px-3 py-1 rounded-full">查看后点击下方按钮</div>
                   </div>
@@ -163,9 +252,6 @@ export const GameRoom: React.FC = () => {
                   >
                     {hasConfirmedViewing ? '等待其他玩家...' : '确认开始'}
                   </button>
-                  <div className="text-center text-xs text-gray-400 mt-2">
-                    已确认: {viewingConfirmedCount} / {alivePlayers.length}
-                  </div>
                 </div>
             </div>
         ) : phase === 'DESCRIBING' ? (
@@ -175,8 +261,8 @@ export const GameRoom: React.FC = () => {
                 ? 'bg-gradient-to-b from-green-900/80 to-gray-900 border-2 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.3)]' 
                 : 'bg-gray-800/50 border border-white/10 backdrop-blur-sm'}
             `}>
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gray-900 px-4 py-1 rounded-full text-xs text-gray-400 border border-gray-700">
-                  {isMyTurn ? "🟢 你的回合" : "🔊 发言中"}
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gray-900 px-4 py-1 rounded-full text-xs text-gray-400 border border-gray-700 flex items-center gap-1">
+                  {isMyTurn ? "🟢 你的回合" : <><Volume2 className="w-3 h-3" /> 发言中</>}
                 </div>
 
                 <div className="mt-4 mb-2">
@@ -249,7 +335,7 @@ export const GameRoom: React.FC = () => {
              </div>
         ) : phase === 'VOTING' ? (
              <div className="bg-gradient-to-br from-red-900/80 to-gray-900 p-6 rounded-2xl text-center border-2 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.2)]">
-                <h3 className="text-2xl font-black text-red-400 mb-2 tracking-tight">🚨 投票处决 🚨</h3>
+                <h3 className="text-2xl font-black text-red-400 mb-2 tracking-tight flex items-center justify-center gap-2"><Siren className="w-6 h-6" /> 投票处决 <Siren className="w-6 h-6" /></h3>
                 <p className="text-sm text-red-200/70 mb-4">点击嫌疑人头像进行投票</p>
                 {me?.votedFor !== undefined ? (
                    <div className="bg-red-500/20 text-red-300 py-2 rounded-lg text-sm border border-red-500/30">
@@ -268,7 +354,8 @@ export const GameRoom: React.FC = () => {
       </div>
 
       {/* 玩家列表 Grid */}
-      <div className="w-full max-w-md grid grid-cols-2 gap-3 pb-8">
+      <div className="w-full max-w-md relative pb-8">
+        <div className="grid grid-cols-2 gap-3">
         {room.players.map((p, index) => {
           const isCurrent = p.id === room.gameState?.currentTurnPlayerId;
           const isMe = p.id === me?.id;
@@ -277,13 +364,23 @@ export const GameRoom: React.FC = () => {
             ((phase === 'VOTING' && p.isAlive) ||
              (phase === 'PK_VOTING' && room.gameState?.pkPlayers?.includes(p.id) && p.isAlive)) &&
             hasNotVoted &&
-            me?.isAlive
+            me?.isAlive &&
+            p.id !== me?.id
           );
           const hasConfirmed = (phase === 'VIEWING' || phase === 'DISTRIBUTING') && room.gameState?.viewingConfirmedPlayers?.includes(p.id);
+          const hasVoted = phase === 'VOTING' && p.votedFor !== undefined && p.votedFor !== null;
+          const hasAbstained = phase === 'VOTING' && p.votedFor === null;
 
           return (
             <div
                 key={p.id}
+                ref={(el) => {
+                  if (el) {
+                    playerCardsRef.current.set(p.id, el);
+                  } else {
+                    playerCardsRef.current.delete(p.id);
+                  }
+                }}
                 className={`
                     relative p-3 rounded-xl flex items-center space-x-3 transition-all duration-300 border overflow-visible
                     ${!p.isAlive
@@ -292,8 +389,12 @@ export const GameRoom: React.FC = () => {
                             ? 'bg-gray-700/80 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.2)] scale-102'
                             : hasConfirmed
                                 ? 'bg-gray-800 border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]'
-                                : 'bg-gray-800 border-gray-700/50 hover:bg-gray-750'}
-                    ${isVotable ? 'cursor-pointer ring-2 ring-red-500/50 hover:bg-red-900/20 hover:scale-105' : ''}
+                                : hasVoted
+                                    ? 'bg-gray-800 border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]'
+                                    : hasAbstained
+                                        ? 'bg-gray-800 border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]'
+                                        : 'bg-gray-800 border-gray-700/50 hover:bg-gray-750'}
+                    ${isVotable ? 'cursor-pointer hover:bg-red-900/20 hover:scale-105' : ''}
                     ${isMe ? 'ring-1 ring-blue-500/30 bg-blue-900/10' : ''}
                     ${(phase === 'PK_DESCRIBING' || phase === 'PK_VOTING') && room.gameState?.pkPlayers?.includes(p.id) ? 'border-orange-500/50 shadow-[0_0_10px_rgba(249,115,22,0.3)]' : ((phase === 'PK_DESCRIBING' || phase === 'PK_VOTING') ? 'opacity-60' : '')}
                 `}
@@ -335,6 +436,48 @@ export const GameRoom: React.FC = () => {
             </div>
           );
         })}
+        </div>
+
+        {/* Vote Arrows */}
+        <svg className="absolute inset-0 pointer-events-none z-10" style={{ width: '100%', height: '100%' }}>
+          <defs>
+            <marker
+              id="arrowhead"
+              markerWidth="8"
+              markerHeight="8"
+              refX="7"
+              refY="2.5"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <path d="M0,0 L0,5 L7,2.5 z" fill="#ef4444" />
+            </marker>
+          </defs>
+          {voteArrows.map((arrow) => {
+            const endX = arrow.startX + Math.cos(arrow.angle * Math.PI / 180) * arrow.length;
+            const endY = arrow.startY + Math.sin(arrow.angle * Math.PI / 180) * arrow.length;
+            const gradientId = `arrowGradient-${arrow.voterId}`;
+
+            return (
+              <g key={`arrow-${arrow.voterId}`}>
+                <linearGradient id={gradientId} x1={arrow.startX} y1={arrow.startY} x2={endX} y2={endY} gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" style={{ stopColor: '#ef4444', stopOpacity: 0.2 }} />
+                  <stop offset="30%" style={{ stopColor: '#ef4444', stopOpacity: 1 }} />
+                  <stop offset="100%" style={{ stopColor: '#ef4444', stopOpacity: 1 }} />
+                </linearGradient>
+                <line
+                  x1={arrow.startX}
+                  y1={arrow.startY}
+                  x2={endX}
+                  y2={endY}
+                  stroke={`url(#${gradientId})`}
+                  strokeWidth="3"
+                  markerEnd="url(#arrowhead)"
+                />
+              </g>
+            );
+          })}
+        </svg>
       </div>
 
       {/* Modals */}
@@ -403,9 +546,6 @@ export const GameRoom: React.FC = () => {
       >
           <div className="text-center py-2">
               <p className="text-lg font-bold text-gray-300 mb-2">投票结束，游戏继续！</p>
-              <div className="text-xs text-gray-500">
-                  已确认: {room.gameState.voteResultConfirmedPlayers?.length || 0} / {alivePlayers.length}
-              </div>
           </div>
       </Modal>
 
