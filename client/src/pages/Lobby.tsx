@@ -57,7 +57,7 @@ export const Lobby: React.FC = () => {
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-900 text-white p-4 font-sans selection:bg-purple-500 selection:text-white">
       <div className="w-full max-w-md">
-        <header className="flex justify-between items-center mb-8 px-4 py-3 bg-white/10 backdrop-blur-md rounded-2xl shadow-lg border border-white/10">
+        <header className="flex justify-between items-center mb-4 px-4 py-3 bg-white/10 backdrop-blur-md rounded-2xl shadow-lg border border-white/10">
           <div>
             <h2 className="text-xl font-bold tracking-tight">房间: <span className="font-mono text-blue-300">{room.id}</span></h2>
             <div className="text-xs text-gray-400 mt-1 flex items-center space-x-2">
@@ -74,8 +74,99 @@ export const Lobby: React.FC = () => {
           </button>
         </header>
 
+        {isHost ? (
+            <div className="bg-gray-800/50 backdrop-blur-sm p-5 rounded-2xl mb-4 border border-white/5">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-bold text-gray-300 flex items-center gap-2">
+                        <Settings size={16} /> 游戏设置
+                    </h3>
+                    <button
+                        onClick={() => setShowSettings(!showSettings)}
+                        className="text-blue-400 text-xs bg-blue-900/20 px-3 py-1.5 rounded-lg hover:bg-blue-900/40 transition"
+                    >
+                        {showSettings ? '收起' : '展开'}
+                    </button>
+                </div>
+
+                {showSettings && (
+                    <div className="space-y-6 animate-fade-in">
+                        {/* Spy Count Control */}
+                        <div className="flex justify-between items-center bg-black/20 p-3 rounded-xl">
+                            <span className="text-sm text-gray-300">卧底人数</span>
+                            <div className="flex items-center space-x-3 bg-gray-900 rounded-lg p-1">
+                                <button
+                                    className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded hover:bg-gray-600 text-gray-200 transition"
+                                    onClick={() => handleConfigChange('spyCount', Math.max(1, (configForm.spyCount || 1) - 1))}
+                                >-</button>
+                                <span className="font-mono w-4 text-center">{configForm.spyCount}</span>
+                                <button
+                                    className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded hover:bg-gray-600 text-gray-200 transition"
+                                    onClick={() => handleConfigChange('spyCount', (configForm.spyCount || 1) + 1)}
+                                >+</button>
+                            </div>
+                        </div>
+
+                        {/* Blank Count Control */}
+                        <div className="flex justify-between items-center bg-black/20 p-3 rounded-xl">
+                            <span className="text-sm text-gray-300">白板人数</span>
+                            <div className="flex items-center space-x-3 bg-gray-900 rounded-lg p-1">
+                                <button
+                                    className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded hover:bg-gray-600 text-gray-200 transition"
+                                    onClick={() => handleConfigChange('blankCount', Math.max(0, (configForm.blankCount || 0) - 1))}
+                                >-</button>
+                                <span className="font-mono w-4 text-center">{configForm.blankCount || 0}</span>
+                                <button
+                                    className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded hover:bg-gray-600 text-gray-200 transition"
+                                    onClick={() => handleConfigChange('blankCount', (configForm.blankCount || 0) + 1)}
+                                >+</button>
+                            </div>
+                        </div>
+
+                        {/* Custom Words Toggle */}
+                        <div className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition">
+                            <span className="text-sm text-gray-300">自定义词语</span>
+
+                            <div className="flex items-center">
+                                {configForm.useCustomWords && (
+                                     <button
+                                        onClick={() => setShowCustomWordsModal(true)}
+                                        className="mr-3 p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded-lg transition"
+                                        title={`当前: ${configForm.customWordPair?.civilian || '未设置'} / ${configForm.customWordPair?.spy || '未设置'}`}
+                                     >
+                                         <Pencil size={16} />
+                                     </button>
+                                )}
+                                <label className="relative inline-block w-12 align-middle select-none transition duration-200 ease-in cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        name="toggle"
+                                        checked={configForm.useCustomWords}
+                                        onChange={openCustomWords}
+                                        className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out checked:translate-x-full checked:border-blue-600"
+                                    />
+                                    <div className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer transition-colors ${configForm.useCustomWords ? 'bg-blue-600' : 'bg-gray-700'}`}></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                 {!showSettings && (
+                    <div className="flex justify-between text-xs text-gray-500 bg-black/20 p-3 rounded-xl">
+                        <span>模式: {room.config.useCustomWords ? '自定义' : '随机'}</span>
+                        <span>卧底: {room.config.spyCount}人</span>
+                        {room.config.blankCount > 0 && <span>白板: {room.config.blankCount}人</span>}
+                    </div>
+                )}
+            </div>
+        ) : (
+             <div className="bg-gray-800/50 p-6 rounded-2xl mb-4 text-center text-gray-500 border border-white/5 flex flex-col items-center gap-2">
+                <Loader2 className="animate-spin" size={24} />
+                等待房主设置游戏...
+             </div>
+        )}
+
         {/* Players Grid */}
-        <div className="grid grid-cols-3 gap-3 mb-8">
+        <div className="grid grid-cols-3 gap-3 mb-4">
           {room.players.map((player, index) => {
              const isMe = player.id === me?.id;
              return (
@@ -111,99 +202,8 @@ export const Lobby: React.FC = () => {
           ))}
         </div>
 
-        {isHost ? (
-            <div className="bg-gray-800/50 backdrop-blur-sm p-5 rounded-2xl mb-8 border border-white/5">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-bold text-gray-300 flex items-center gap-2">
-                        <Settings size={16} /> 游戏设置
-                    </h3>
-                    <button 
-                        onClick={() => setShowSettings(!showSettings)} 
-                        className="text-blue-400 text-xs bg-blue-900/20 px-3 py-1.5 rounded-lg hover:bg-blue-900/40 transition"
-                    >
-                        {showSettings ? '收起' : '展开'}
-                    </button>
-                </div>
-                
-                {showSettings && (
-                    <div className="space-y-6 animate-fade-in">
-                        {/* Spy Count Control */}
-                        <div className="flex justify-between items-center bg-black/20 p-3 rounded-xl">
-                            <span className="text-sm text-gray-300">卧底人数</span>
-                            <div className="flex items-center space-x-3 bg-gray-900 rounded-lg p-1">
-                                <button 
-                                    className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded hover:bg-gray-600 text-gray-200 transition" 
-                                    onClick={() => handleConfigChange('spyCount', Math.max(1, (configForm.spyCount || 1) - 1))}
-                                >-</button>
-                                <span className="font-mono w-4 text-center">{configForm.spyCount}</span>
-                                <button 
-                                    className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded hover:bg-gray-600 text-gray-200 transition" 
-                                    onClick={() => handleConfigChange('spyCount', (configForm.spyCount || 1) + 1)}
-                                >+</button>
-                            </div>
-                        </div>
-
-                        {/* Blank Count Control */}
-                        <div className="flex justify-between items-center bg-black/20 p-3 rounded-xl">
-                            <span className="text-sm text-gray-300">白板人数</span>
-                            <div className="flex items-center space-x-3 bg-gray-900 rounded-lg p-1">
-                                <button 
-                                    className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded hover:bg-gray-600 text-gray-200 transition" 
-                                    onClick={() => handleConfigChange('blankCount', Math.max(0, (configForm.blankCount || 0) - 1))}
-                                >-</button>
-                                <span className="font-mono w-4 text-center">{configForm.blankCount || 0}</span>
-                                <button 
-                                    className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded hover:bg-gray-600 text-gray-200 transition" 
-                                    onClick={() => handleConfigChange('blankCount', (configForm.blankCount || 0) + 1)}
-                                >+</button>
-                            </div>
-                        </div>
-
-                        {/* Custom Words Toggle */}
-                        <div className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition">
-                            <span className="text-sm text-gray-300">自定义词语</span>
-                            
-                            <div className="flex items-center">
-                                {configForm.useCustomWords && (
-                                     <button 
-                                        onClick={() => setShowCustomWordsModal(true)}
-                                        className="mr-3 p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded-lg transition"
-                                        title={`当前: ${configForm.customWordPair?.civilian || '未设置'} / ${configForm.customWordPair?.spy || '未设置'}`}
-                                     >
-                                         <Pencil size={16} />
-                                     </button>
-                                )}
-                                <label className="relative inline-block w-12 align-middle select-none transition duration-200 ease-in cursor-pointer">
-                                    <input 
-                                        type="checkbox" 
-                                        name="toggle" 
-                                        checked={configForm.useCustomWords} 
-                                        onChange={openCustomWords}
-                                        className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out checked:translate-x-full checked:border-blue-600"
-                                    />
-                                    <div className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer transition-colors ${configForm.useCustomWords ? 'bg-blue-600' : 'bg-gray-700'}`}></div>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                 {!showSettings && (
-                    <div className="flex justify-between text-xs text-gray-500 bg-black/20 p-3 rounded-xl">
-                        <span>模式: {room.config.useCustomWords ? '自定义' : '随机'}</span>
-                        <span>卧底: {room.config.spyCount}人</span>
-                        {room.config.blankCount > 0 && <span>白板: {room.config.blankCount}人</span>}
-                    </div>
-                )}
-            </div>
-        ) : (
-             <div className="bg-gray-800/50 p-6 rounded-2xl mb-8 text-center text-gray-500 border border-white/5 flex flex-col items-center gap-2">
-                <Loader2 className="animate-spin" size={24} />
-                等待房主设置游戏...
-             </div>
-        )}
-
         <div className="space-y-3">
-          {isHost ? (
+          {isHost && (
             <button
               onClick={startGame}
               disabled={room.players.length < 3}
@@ -211,10 +211,6 @@ export const Lobby: React.FC = () => {
             >
               {room.players.length < 3 ? '至少需要3人' : '开始游戏'}
             </button>
-          ) : (
-            <div className="text-center text-gray-400 animate-pulse text-sm py-2">
-              等待房主开始游戏...
-            </div>
           )}
         </div>
       </div>

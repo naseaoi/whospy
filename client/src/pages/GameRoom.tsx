@@ -336,18 +336,26 @@ export const GameRoom: React.FC = () => {
         ) : phase === 'VOTING' ? (
              <div className="bg-gradient-to-br from-red-900/80 to-gray-900 p-6 rounded-2xl text-center border-2 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.2)]">
                 <h3 className="text-2xl font-black text-red-400 mb-2 tracking-tight flex items-center justify-center gap-2"><Siren className="w-6 h-6" /> 投票处决 <Siren className="w-6 h-6" /></h3>
-                <p className="text-sm text-red-200/70 mb-4">点击嫌疑人头像进行投票</p>
-                {me?.votedFor !== undefined ? (
-                   <div className="bg-red-500/20 text-red-300 py-2 rounded-lg text-sm border border-red-500/30">
-                     {me.votedFor === null ? '已弃票' : `已投票给: ${room.players.find(p => p.id === me.votedFor)?.name}`}
+                {!me?.isAlive ? (
+                   <div className="bg-gray-700/30 text-gray-400 py-2 rounded-lg text-sm border border-gray-600/30">
+                     你已出局，请等待投票结果...
                    </div>
                 ) : (
-                   <button
-                     onClick={() => handleVoteClick(null)}
-                     className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold py-2 px-4 rounded-lg transition border border-gray-600"
-                   >
-                     弃票
-                   </button>
+                  <>
+                    <p className="text-sm text-red-200/70 mb-4">点击嫌疑人头像进行投票</p>
+                    {me?.votedFor !== undefined ? (
+                       <div className="bg-red-500/20 text-red-300 py-2 rounded-lg text-sm border border-red-500/30">
+                         {me.votedFor === null ? '已弃票' : `已投票给: ${room.players.find(p => p.id === me.votedFor)?.name}`}
+                       </div>
+                    ) : (
+                       <button
+                         onClick={() => handleVoteClick(null)}
+                         className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold py-2 px-4 rounded-lg transition border border-gray-600"
+                       >
+                         弃票
+                       </button>
+                    )}
+                  </>
                 )}
              </div>
         ) : null}
@@ -439,7 +447,7 @@ export const GameRoom: React.FC = () => {
         </div>
 
         {/* Vote Arrows */}
-        <svg className="absolute inset-0 pointer-events-none z-10" style={{ width: '100%', height: '100%' }}>
+        <svg className="absolute inset-0 pointer-events-none z-40" style={{ width: '100%', height: '100%' }}>
           <defs>
             <marker
               id="arrowhead"
