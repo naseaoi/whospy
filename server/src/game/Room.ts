@@ -743,8 +743,8 @@ export class Room {
       throw new Error('白板人数必须是大于等于 0 的整数');
     }
 
-    if (config.spyCount + config.blankCount > this.players.length) {
-      throw new Error('卧底和白板总人数不能超过玩家总人数');
+    if (config.spyCount + config.blankCount >= this.players.length) {
+      throw new Error('卧底和白板总人数必须少于玩家总人数（至少保留1个平民）');
     }
 
     if (config.useCustomWords) {
