@@ -60,7 +60,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       cancelText={cancelText}
     >
       <div className="text-center py-4">
-        <div className={`text-6xl mb-4 ${getIconColor()}`}>
+        <div className={`flex justify-center mb-4 ${getIconColor()}`}>
           {getIcon()}
         </div>
         <div className="text-gray-300 text-base leading-relaxed">
