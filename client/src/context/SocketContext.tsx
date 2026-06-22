@@ -35,7 +35,7 @@ interface SocketContextType {
   updateConfig: (config: Partial<GameConfig>) => void;
   confirmViewing: () => void;
   finishTurn: () => void;
-  vote: (targetId: string) => void;
+  vote: (targetId: string | null) => void;
   confirmVoteResult: () => void;
   restartGame: () => void;
   leaveRoom: () => void;
@@ -97,7 +97,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     newSocket.on('disconnect', () => setIsConnected(false));
     
     newSocket.on('room_created', ({ roomId }) => {
-      console.log('Room created:', roomId);
       setSessionValue(LAST_ROOM_ID_KEY, roomId);
     });
 
@@ -137,7 +136,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const createRoom = (name: string, avatar: string) => {
     const playerToken = getPlayerToken();
     setNotices([]);
-    console.log('Emitting create_room:', { playerName: name, avatar });
     socket?.emit('create_room', { playerName: name, avatar, playerToken });
   };
 
@@ -163,7 +161,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     socket?.emit('finish_turn');
   };
 
-  const vote = (targetPlayerId: string) => {
+  const vote = (targetPlayerId: string | null) => {
     socket?.emit('vote', { targetPlayerId });
   };
 

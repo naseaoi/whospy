@@ -6,7 +6,7 @@ export interface Player {
   role?: 'CIVILIAN' | 'SPY' | 'BLANK';
   word?: string;
   isAlive: boolean;
-  votedFor?: string;
+  votedFor?: string | null;
   isReady?: boolean;
 }
 

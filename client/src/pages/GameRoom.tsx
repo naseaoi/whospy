@@ -8,7 +8,7 @@ export const GameRoom: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(0);
   
   // Modal States
-  const [showVoteConfirm, setShowVoteConfirm] = useState<string | null>(null);
+  const [showVoteConfirm, setShowVoteConfirm] = useState<string | null | undefined>(undefined);
   const [showWordModal, setShowWordModal] = useState(false);
 
   // Sync timer
@@ -41,18 +41,18 @@ export const GameRoom: React.FC = () => {
   const viewingConfirmedCount = room.gameState.viewingConfirmedPlayers?.length || 0;
   const hasConfirmedViewing = room.gameState.viewingConfirmedPlayers?.includes(me?.id || '') || false;
 
-  const handleVoteClick = (targetId: string) => {
+  const handleVoteClick = (targetId: string | null) => {
       setShowVoteConfirm(targetId);
   };
 
   const confirmVote = () => {
-      if (showVoteConfirm) {
+      if (showVoteConfirm !== undefined) {
           vote(showVoteConfirm);
-          setShowVoteConfirm(null);
+          setShowVoteConfirm(undefined);
       }
   };
 
-  const targetPlayerName = room.players.find(p => p.id === showVoteConfirm)?.name;
+  const targetPlayerName = showVoteConfirm ? room.players.find(p => p.id === showVoteConfirm)?.name : null;
 
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-900 text-white p-4 font-sans selection:bg-purple-500 selection:text-white">
@@ -161,7 +161,7 @@ export const GameRoom: React.FC = () => {
                         : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white active:scale-95 border-green-800 active:border-b-0 active:translate-y-1'
                     }`}
                   >
-                    {hasConfirmedViewing ? '已确认，等待其他玩家...' : '开始游戏'}
+                    {hasConfirmedViewing ? '等待其他玩家...' : '确认开始'}
                   </button>
                   <div className="text-center text-xs text-gray-400 mt-2">
                     已确认: {viewingConfirmedCount} / {alivePlayers.length}
@@ -251,10 +251,17 @@ export const GameRoom: React.FC = () => {
              <div className="bg-gradient-to-br from-red-900/80 to-gray-900 p-6 rounded-2xl text-center border-2 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.2)]">
                 <h3 className="text-2xl font-black text-red-400 mb-2 tracking-tight">🚨 投票处决 🚨</h3>
                 <p className="text-sm text-red-200/70 mb-4">点击嫌疑人头像进行投票</p>
-                {me?.votedFor && (
+                {me?.votedFor !== undefined ? (
                    <div className="bg-red-500/20 text-red-300 py-2 rounded-lg text-sm border border-red-500/30">
-                     已投票给: {room.players.find(p => p.id === me.votedFor)?.name}
+                     {me.votedFor === null ? '已弃票' : `已投票给: ${room.players.find(p => p.id === me.votedFor)?.name}`}
                    </div>
+                ) : (
+                   <button
+                     onClick={() => handleVoteClick(null)}
+                     className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold py-2 px-4 rounded-lg transition border border-gray-600"
+                   >
+                     弃票
+                   </button>
                 )}
              </div>
         ) : null}
@@ -265,18 +272,27 @@ export const GameRoom: React.FC = () => {
         {room.players.map((p, index) => {
           const isCurrent = p.id === room.gameState?.currentTurnPlayerId;
           const isMe = p.id === me?.id;
-          const isVotable = ((phase === 'VOTING' || (phase === 'PK_VOTING' && room.gameState?.pkPlayers?.includes(p.id))) && p.isAlive && !isMe && !me?.votedFor && me?.isAlive) || false;
+          const hasNotVoted = me?.votedFor === undefined;
+          const isVotable = (
+            ((phase === 'VOTING' && p.isAlive) ||
+             (phase === 'PK_VOTING' && room.gameState?.pkPlayers?.includes(p.id) && p.isAlive)) &&
+            hasNotVoted &&
+            me?.isAlive
+          );
+          const hasConfirmed = (phase === 'VIEWING' || phase === 'DISTRIBUTING') && room.gameState?.viewingConfirmedPlayers?.includes(p.id);
 
           return (
-            <div 
-                key={p.id} 
+            <div
+                key={p.id}
                 className={`
                     relative p-3 rounded-xl flex items-center space-x-3 transition-all duration-300 border overflow-visible
-                    ${!p.isAlive 
-                        ? 'bg-gray-800/30 border-gray-800 opacity-60 grayscale' 
-                        : isCurrent 
-                            ? 'bg-gray-700/80 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.2)] scale-102' 
-                            : 'bg-gray-800 border-gray-700/50 hover:bg-gray-750'}
+                    ${!p.isAlive
+                        ? 'bg-gray-800/30 border-gray-800 opacity-60 grayscale'
+                        : isCurrent
+                            ? 'bg-gray-700/80 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.2)] scale-102'
+                            : hasConfirmed
+                                ? 'bg-gray-800 border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]'
+                                : 'bg-gray-800 border-gray-700/50 hover:bg-gray-750'}
                     ${isVotable ? 'cursor-pointer ring-2 ring-red-500/50 hover:bg-red-900/20 hover:scale-105' : ''}
                     ${isMe ? 'ring-1 ring-blue-500/30 bg-blue-900/10' : ''}
                     ${(phase === 'PK_DESCRIBING' || phase === 'PK_VOTING') && room.gameState?.pkPlayers?.includes(p.id) ? 'border-orange-500/50 shadow-[0_0_10px_rgba(249,115,22,0.3)]' : ((phase === 'PK_DESCRIBING' || phase === 'PK_VOTING') ? 'opacity-60' : '')}
@@ -307,12 +323,13 @@ export const GameRoom: React.FC = () => {
                     <div className="font-bold text-sm truncate text-gray-200">{p.name}</div>
                     <div className="flex items-center space-x-1 mt-1">
                         {p.isOnline ? (
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_5px_rgba(34,197,94,0.8)]"></div> 
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_5px_rgba(34,197,94,0.8)]"></div>
                         ) : (
                             <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
                         )}
                         {isCurrent && <span className="text-[10px] text-yellow-400 animate-pulse">发言中</span>}
-                        {p.votedFor && phase === 'VOTING' && <span className="text-[10px] text-green-400">已投</span>}
+                        {phase === 'VOTING' && p.votedFor === null && <span className="text-[10px] text-gray-400">弃票</span>}
+                        {phase === 'VOTING' && p.votedFor !== undefined && p.votedFor !== null && <span className="text-[10px] text-green-400">已投</span>}
                     </div>
                 </div>
             </div>
@@ -321,16 +338,25 @@ export const GameRoom: React.FC = () => {
       </div>
 
       {/* Modals */}
-      <Modal 
-        isOpen={!!showVoteConfirm} 
-        onClose={() => setShowVoteConfirm(null)}
+      <Modal
+        isOpen={showVoteConfirm !== undefined}
+        onClose={() => setShowVoteConfirm(undefined)}
         onConfirm={confirmVote}
-        title="确认投票"
+        title={showVoteConfirm === null ? "确认弃票" : "确认投票"}
         type="confirm"
       >
         <div className="text-center">
-            你确定要投给 <span className="text-red-400 font-bold">{targetPlayerName}</span> 吗？
-            <div className="text-xs text-gray-500 mt-2">一旦投票无法更改</div>
+            {showVoteConfirm === null ? (
+              <>
+                你确定要<span className="text-gray-400 font-bold">弃票</span>吗？
+                <div className="text-xs text-gray-500 mt-2">弃票后无法更改</div>
+              </>
+            ) : (
+              <>
+                你确定要投给 <span className="text-red-400 font-bold">{targetPlayerName}</span> 吗？
+                <div className="text-xs text-gray-500 mt-2">一旦投票无法更改</div>
+              </>
+            )}
         </div>
       </Modal>
 

@@ -439,40 +439,48 @@ export class Room {
     this.gameState.currentTurnPlayerId = undefined;
     this.gameState.phaseEndTime = undefined;
     this.gameState.voteResult = {};
-    
-    // Clear previous votes
-    this.players.forEach(p => p.votedFor = undefined);
+
+    // Clear previous votes - 删除 votedFor 属性
+    this.players.forEach(p => {
+      p.votedFor = undefined;
+    });
 
     this.onUpdate(this.id);
     this.clearTimer();
   }
 
-  handleVote(voterId: string, targetId: string) {
+  handleVote(voterId: string, targetId: string | null) {
     if (!this.gameState || (this.gameState.phase !== 'VOTING' && this.gameState.phase !== 'PK_VOTING')) return;
-    
+
+    const voter = this.getPlayer(voterId);
+    if (!voter || !voter.isAlive) return;
+
+    // 弃票：targetId 为 null
+    if (targetId === null) {
+      voter.votedFor = null;
+      this.tryResolveVotingIfReady();
+      return;
+    }
+
     // In PK Voting, can only vote for PK players
     if (this.gameState.phase === 'PK_VOTING') {
         if (!this.gameState.pkPlayers?.includes(targetId)) return;
     }
-    
-    const voter = this.getPlayer(voterId);
-    const target = this.getPlayer(targetId);
 
-    if (!voter || !voter.isAlive) return; // Dead players can't vote
+    const target = this.getPlayer(targetId);
     if (!target || !target.isAlive) return;
-    if (voterId === targetId) return; // Can't vote self
 
     // Record vote
     voter.votedFor = targetId;
-    
+
     // Check if all alive players voted
     this.tryResolveVotingIfReady();
   }
 
   private resolveVotes() {
     if (!this.gameState) return;
-    
-    // Tally votes - 只统计存活玩家的投票
+
+    // Tally votes - 只统计存活玩家的投票（弃票不计入）
     const votes: Record<string, number> = {};
     this.players.forEach(p => {
         if (p.isAlive && p.votedFor) {
@@ -495,15 +503,27 @@ export class Room {
 
     let isGameOver = false;
 
-    // Eliminate or PK
-    if (targetIds.length === 1) {
+    // 特殊情况：没有人得票（所有人都弃票或无有效投票）
+    if (targetIds.length === 0) {
+        // 本轮无人淘汰，直接进入下一轮
+        isGameOver = this.checkWinCondition();
+
+        if (isGameOver) {
+            this.status = 'GAME_OVER';
+            this.gameState.phase = 'GAME_OVER';
+        } else {
+            this.gameState.phase = 'VOTE_RESULT';
+            this.gameState.voteResultConfirmedPlayers = [];
+        }
+    } else if (targetIds.length === 1) {
+        // 单人得最高票，淘汰
         const eliminatedId = targetIds[0];
         const eliminatedPlayer = this.getPlayer(eliminatedId);
         if (eliminatedPlayer) {
             eliminatedPlayer.isAlive = false;
         }
         isGameOver = this.checkWinCondition();
-        
+
         if (isGameOver) {
             this.status = 'GAME_OVER';
             this.gameState.phase = 'GAME_OVER';
@@ -513,23 +533,17 @@ export class Room {
         }
     } else {
         // Handle Tie (PK)
-        // If we are ALREADY in PK_VOTING and still tie, we probably should just move on or random elim?
-        // Standard rule: If PK again, usually keep everyone or eliminate all tied (but that ends game too fast).
-        // For this implementation: If Tie in PK_VOTING, we just proceed to next round without elimination to avoid infinite loops.
-        
         if (this.gameState.phase === 'PK_VOTING') {
              // Second Tie (during PK) -> No elimination, proceed to next round
-             // Need check win condition here? Theoretically possible if someone disconnected/died? 
-             // Unlikely but safe to check.
              isGameOver = this.checkWinCondition();
-             
+
              if (isGameOver) {
                 this.status = 'GAME_OVER';
                 this.gameState.phase = 'GAME_OVER';
              } else {
                 this.gameState.phase = 'VOTE_RESULT';
                 this.gameState.voteResultConfirmedPlayers = [];
-                this.gameState.pkPlayers = undefined; // Clear PK state
+                this.gameState.pkPlayers = undefined;
              }
         } else {
             // First Tie -> Enter PK Announcement
@@ -539,25 +553,25 @@ export class Room {
             const announcementDuration = 5000;
             this.gameState.phaseEndTime = Date.now() + announcementDuration;
             this.onUpdate(this.id);
-            
+
             // Auto transition to PK_DESCRIBING
             this.clearTimer();
             this.timer = setTimeout(() => {
                 if (!this.gameState || this.gameState.phase !== 'PK_ANNOUNCEMENT') return;
-                
+
                 this.gameState.phase = 'PK_DESCRIBING';
                 this.currentTurnIndex = 0;
                 // Filter turnOrder to only include PK players
                 this.turnOrder = this.players.map(p => p.id).filter(id => this.gameState!.pkPlayers!.includes(id));
-                
+
                 this.onUpdate(this.id);
                 this.startTurn();
             }, announcementDuration);
 
-            return; 
+            return;
         }
     }
-    
+
     this.onUpdate(this.id);
   }
 
@@ -725,7 +739,7 @@ export class Room {
       return;
     }
 
-    const voteCount = votingParticipants.filter(player => player.votedFor).length;
+    const voteCount = votingParticipants.filter(player => player.votedFor !== undefined).length;
     if (voteCount >= votingParticipants.length) {
       this.resolveVotes();
       return;
