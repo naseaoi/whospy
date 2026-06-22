@@ -630,32 +630,37 @@ export class Room {
       const blanks = this.players.filter(p => p.isAlive && p.role === 'BLANK');
       const civilians = this.players.filter(p => p.isAlive && p.role === 'CIVILIAN');
       const totalAlive = spies.length + blanks.length + civilians.length;
-      
-      // 平民获胜：所有卧底及白板出局
-      if (spies.length === 0 && blanks.length === 0) {
+
+      const totalInitialPlayers = this.initialPlayerCount || this.players.length;
+      const threshold = totalInitialPlayers < 7 ? 2 : 3;
+
+      // 平民获胜：所有卧底和白板都出局
+      if (spies.length === 0 && blanks.length === 0 && civilians.length > 0) {
           if (this.gameState) this.gameState.winner = 'CIVILIAN';
           return true;
       }
 
-      // 卧底获胜
-      // 使用游戏开始时的玩家数计算阈值，避免中途退出影响判定
-      const totalInitialPlayers = this.initialPlayerCount || this.players.length;
-      const threshold = totalInitialPlayers < 7 ? 2 : 3;
-
+      // 卧底获胜：卧底存活且场上人数 <= 阈值
       if (spies.length > 0 && totalAlive <= threshold) {
            if (this.gameState) this.gameState.winner = 'SPY';
            return true;
       }
-      
-      // 白板获胜：所有卧底出局且白板存活，且存活人数达到胜利条件
-      if (spies.length === 0 && blanks.length > 0) {
-           // 如果还有白板，必须等到人数减少到阈值才算白板获胜
-           if (totalAlive <= threshold) {
-                if (this.gameState) this.gameState.winner = 'BLANK';
-                return true;
-           }
-           // 否则游戏继续
-           return false;
+
+      // 白板获胜：所有卧底出局，白板存活，场上人数 <= 阈值
+      if (spies.length === 0 && blanks.length > 0 && totalAlive <= threshold) {
+           if (this.gameState) this.gameState.winner = 'BLANK';
+           return true;
+      }
+
+      // 特殊情况：只剩卧底或只剩白板（无其他角色）
+      if (totalAlive === spies.length && spies.length > 0) {
+          if (this.gameState) this.gameState.winner = 'SPY';
+          return true;
+      }
+
+      if (totalAlive === blanks.length && blanks.length > 0) {
+          if (this.gameState) this.gameState.winner = 'BLANK';
+          return true;
       }
 
       return false;
@@ -743,8 +748,13 @@ export class Room {
       throw new Error('白板人数必须是大于等于 0 的整数');
     }
 
-    if (config.spyCount + config.blankCount >= this.players.length) {
-      throw new Error('卧底和白板总人数必须少于玩家总人数（至少保留1个平民）');
+    if (config.spyCount + config.blankCount > this.players.length) {
+      throw new Error('卧底和白板总人数不能超过玩家总人数');
+    }
+
+    const civilianCount = this.players.length - config.spyCount - config.blankCount;
+    if (civilianCount === 0 && config.useCustomWords) {
+      throw new Error('没有平民时，无法使用自定义词语（平民词将无人使用）');
     }
 
     if (config.useCustomWords) {
