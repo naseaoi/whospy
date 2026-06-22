@@ -89,7 +89,7 @@ export class SocketHandler {
       if (joinedPlayer) {
         this.emitRoomNotice(
           room.id,
-          `${joinedPlayer.name}${wasReconnect ? ' 重新连接' : ' 加入了房间'}。${this.getHostLabel(room.id)}`
+          `${joinedPlayer.name}${wasReconnect ? ' 重新连接' : ' 加入了房间'}。`
         );
       }
       this.emitRoomUpdate(room.id);
@@ -113,7 +113,7 @@ export class SocketHandler {
       socket.join(room.id);
       const rejoinPlayer = room.getPlayer(socket.id);
       if (rejoinPlayer) {
-        this.emitRoomNotice(room.id, `${rejoinPlayer.name} 重新连接。${this.getHostLabel(room.id)}`);
+        this.emitRoomNotice(room.id, `${rejoinPlayer.name} 重新连接。`);
       }
       this.emitRoomUpdate(room.id);
     } catch (e: any) {
@@ -203,14 +203,22 @@ export class SocketHandler {
 
   private handleLeaveRoom(socket: Socket): void {
     const roomId = this.socketToRoom.get(socket.id);
-    if (roomId) {
-      const room = this.roomManager.getRoom(roomId);
-      const player = room?.getPlayer(socket.id);
-      if (player) {
-        this.emitRoomNotice(roomId, `${player.name} 退出了房间。${this.getHostLabel(roomId)}`);
+    if (!roomId) return;
+
+    const room = this.roomManager.getRoom(roomId);
+    const player = room?.getPlayer(socket.id);
+    const playerName = player?.name;
+    const wasHost = room?.hostId === socket.id;
+
+    this.removeSocketFromCurrentRoom(socket);
+
+    if (playerName) {
+      const finalRoom = this.roomManager.getRoom(roomId);
+      if (finalRoom && finalRoom.players.length > 0) {
+        const hostLabel = wasHost ? ` ${this.getHostLabel(roomId)}` : '';
+        this.emitRoomNotice(roomId, `${playerName} 退出了房间。${hostLabel}`);
       }
     }
-    this.removeSocketFromCurrentRoom(socket);
   }
 
   private handleDisconnect(socket: Socket): void {
