@@ -6,6 +6,7 @@
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Node.js](https://img.shields.io/badge/Node.js-16+-green.svg)](https://nodejs.org/)
 [![Socket.io](https://img.shields.io/badge/Socket.io-4-black.svg)](https://socket.io/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://github.com/naseaoi/whospy/pkgs/container/whospy)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## ✨ 特性
@@ -97,7 +98,28 @@ pm2 startup
 
 ### Docker 部署
 
-项目根目录已包含 `Dockerfile`，直接构建并运行：
+#### 使用预构建镜像（推荐）
+
+直接从 GitHub Container Registry 拉取最新版本：
+
+```bash
+# 拉取最新版本
+docker pull ghcr.io/naseaoi/whospy:latest
+
+# 或指定版本
+docker pull ghcr.io/naseaoi/whospy:1.1.0
+
+# 运行容器
+docker run -d -p 3001:3001 \
+  -e PORT=3001 \
+  -e CORS_ORIGIN=https://yourdomain.com \
+  --name whospy-app \
+  ghcr.io/naseaoi/whospy:latest
+```
+
+#### 本地构建镜像
+
+项目根目录已包含 `Dockerfile`，可自行构建：
 
 ```bash
 docker build -t whospy .
