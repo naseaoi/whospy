@@ -5,7 +5,7 @@ import type { GameConfig } from '../types';
 import { Modal } from '../components/Modal';
 
 export const Lobby: React.FC = () => {
-  const { room, socket, startGame, updateConfig } = useSocket();
+  const { room, socket, startGame, updateConfig, leaveRoom } = useSocket();
   const [showSettings, setShowSettings] = useState(false);
   const [showCustomWordsModal, setShowCustomWordsModal] = useState(false);
 
@@ -197,19 +197,32 @@ export const Lobby: React.FC = () => {
              </div>
         )}
 
-        {isHost ? (
-          <button 
-            onClick={startGame}
-            disabled={room.players.length < 3}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95 border-b-4 border-blue-900 active:border-b-0 active:translate-y-1"
+        <div className="space-y-3">
+          {isHost ? (
+            <button
+              onClick={startGame}
+              disabled={room.players.length < 3}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95 border-b-4 border-blue-900 active:border-b-0 active:translate-y-1"
+            >
+              {room.players.length < 3 ? '至少需要3人' : '开始游戏'}
+            </button>
+          ) : (
+            <div className="text-center text-gray-400 animate-pulse text-sm py-2">
+              等待房主开始游戏...
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              if (confirm('确定要退出房间吗？')) {
+                leaveRoom();
+              }
+            }}
+            className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-3 rounded-xl transition transform active:scale-95"
           >
-            {room.players.length < 3 ? '至少需要3人' : '开始游戏'}
+            退出房间
           </button>
-        ) : (
-          <div className="text-center text-gray-400 animate-pulse text-sm">
-            <br/>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Custom Words Modal */}

@@ -27,12 +27,29 @@ const NoticeOverlay: React.FC = () => {
 
 const AppContent: React.FC = () => {
   const { room } = useSocket();
+  const [currentView, setCurrentView] = React.useState<'home' | 'lobby' | 'game'>('home');
 
-  if (!room) {
+  React.useEffect(() => {
+    if (!room) {
+      setCurrentView('home');
+      return;
+    }
+
+    if (room.status === 'WAITING') {
+      setCurrentView('lobby');
+      return;
+    }
+
+    if (room.status === 'PLAYING' || room.status === 'GAME_OVER') {
+      setCurrentView('game');
+    }
+  }, [room?.status, room?.id]);
+
+  if (currentView === 'home') {
     return <Home />;
   }
 
-  if (room.status === 'WAITING') {
+  if (currentView === 'lobby') {
     return <Lobby />;
   }
 

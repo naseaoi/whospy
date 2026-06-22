@@ -108,19 +108,29 @@ const normalizePlayerToken = (value: unknown): string => {
 io.on('connection', (socket: Socket) => {
   console.log('User connected:', socket.id);
 
-  // Helper to send room update
   const emitRoomUpdate = (roomId: string) => {
     const room = roomManager.getRoom(roomId);
-    if (room) {
-      const roomSockets = io.sockets.adapter.rooms.get(roomId);
-      if (!roomSockets) {
+    if (!room) {
+      return;
+    }
+
+    const roomSockets = io.sockets.adapter.rooms.get(roomId);
+    if (!roomSockets) {
+      return;
+    }
+
+    roomSockets.forEach(roomSocketId => {
+      const socket = io.sockets.sockets.get(roomSocketId);
+      if (!socket || !socket.connected) {
         return;
       }
 
-      roomSockets.forEach(roomSocketId => {
-        io.to(roomSocketId).emit('room_updated', room.toDataForPlayer(roomSocketId));
-      });
-    }
+      try {
+        socket.emit('room_updated', room.toDataForPlayer(roomSocketId));
+      } catch (error) {
+        console.error(`Failed to emit room_updated to ${roomSocketId}:`, error);
+      }
+    });
   };
 
   const emitRoomNotice = (roomId: string, message: string) => {

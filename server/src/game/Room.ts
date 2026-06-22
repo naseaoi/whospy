@@ -743,9 +743,8 @@ export class Room {
       throw new Error('白板人数必须是大于等于 0 的整数');
     }
 
-    const maxSpecialRoles = this.players.length - 1;
-    if (config.spyCount + config.blankCount > maxSpecialRoles) {
-      throw new Error('卧底和白板总人数不能超过玩家人数减 1');
+    if (config.spyCount + config.blankCount > this.players.length) {
+      throw new Error('卧底和白板总人数不能超过玩家总人数');
     }
 
     if (config.useCustomWords) {

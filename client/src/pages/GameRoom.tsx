@@ -369,7 +369,7 @@ export const GameRoom: React.FC = () => {
         title="游戏结束"
         type="confirm"
         confirmText={isHost ? "再来一局" : "等待房主"}
-        cancelText="退出房间"
+        cancelText="返回大厅"
         onConfirm={() => isHost && restartGame()}
         onClose={leaveRoom}
       >
