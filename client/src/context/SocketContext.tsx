@@ -101,6 +101,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     newSocket.on('room_updated', (data: RoomData) => {
+      const isPlayerInRoom = data.players.some(p => p.id === newSocket.id);
+      if (!isPlayerInRoom) {
+        return;
+      }
       setRoom(data);
       setError(null);
       setSessionValue(LAST_ROOM_ID_KEY, data.id);
