@@ -66,9 +66,12 @@ export const Lobby: React.FC = () => {
                 <span>{room.config.useCustomWords ? '自定义词库' : '随机词库'}</span>
             </div>
           </div>
-          <span className="bg-blue-600/20 text-blue-200 px-3 py-1 rounded-full text-xs font-bold border border-blue-500/30 animate-pulse">
-            等待开始
-          </span>
+          <button
+            onClick={() => setShowLeaveConfirm(true)}
+            className="bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold px-3 py-1.5 rounded-lg text-xs transition"
+          >
+            退出房间
+          </button>
         </header>
 
         {/* Players Grid */}
@@ -204,7 +207,7 @@ export const Lobby: React.FC = () => {
             <button
               onClick={startGame}
               disabled={room.players.length < 3}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95 border-b-4 border-blue-900 active:border-b-0 active:translate-y-1"
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition"
             >
               {room.players.length < 3 ? '至少需要3人' : '开始游戏'}
             </button>
@@ -213,13 +216,6 @@ export const Lobby: React.FC = () => {
               等待房主开始游戏...
             </div>
           )}
-
-          <button
-            onClick={() => setShowLeaveConfirm(true)}
-            className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-3 rounded-xl transition transform active:scale-95"
-          >
-            退出房间
-          </button>
         </div>
       </div>
 
@@ -264,10 +260,7 @@ export const Lobby: React.FC = () => {
         confirmText="确定退出"
         cancelText="取消"
         type="warning"
-        onConfirm={() => {
-          setShowLeaveConfirm(false);
-          leaveRoom();
-        }}
+        onConfirm={leaveRoom}
         onCancel={() => setShowLeaveConfirm(false)}
       />
     </div>
