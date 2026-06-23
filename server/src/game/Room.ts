@@ -811,7 +811,7 @@ export class Room {
 
   private emitUpdate() {
     this.clearPendingUpdate();
-    this.scheduleUpdate();
+    this.onUpdate(this.id);
   }
 
   /** Fisher-Yates 原地洗牌，保证均匀随机分布 */
