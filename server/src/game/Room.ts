@@ -23,6 +23,7 @@ export class Room {
   private playerIdToToken: Map<string, string> = new Map();
   private playersMap: Map<string, Player> = new Map();
   private pendingUpdate: NodeJS.Timeout | null = null;
+  private voteCache: Record<string, number> = {};
 
   // Callback to emit updates to room
   private onUpdate: (roomId: string) => void;
@@ -340,15 +341,13 @@ export class Room {
       this.words = getRandomWord();
     }
     
-    // Role Assignment
+    // Role Assignment（原地分配角色，避免额外数组）
     const spies = this.config.spyCount;
     const blanks = this.config.blankCount;
-    
-    // Fisher-Yates 洗牌（角色分配）
-    const shuffledForRoles = this.players.map(p => p.id);
-    this.shuffleArray(shuffledForRoles);
-    const spyIds = new Set(shuffledForRoles.slice(0, spies));
-    const blankIds = new Set(shuffledForRoles.slice(spies, spies + blanks));
+
+    this.shuffleArray(this.players);
+    const spyIds = new Set(this.players.slice(0, spies).map(p => p.id));
+    const blankIds = new Set(this.players.slice(spies, spies + blanks).map(p => p.id));
 
     this.players.forEach(p => {
       p.isAlive = true;
@@ -451,6 +450,7 @@ export class Room {
     this.players.forEach(p => {
       p.votedFor = undefined;
     });
+    this.voteCache = {};
 
     this.emitUpdate();
     this.clearTimer();
@@ -461,6 +461,16 @@ export class Room {
 
     const voter = this.getPlayer(voterId);
     if (!voter || !voter.isAlive) return;
+
+    // 移除旧投票的缓存计数
+    if (voter.votedFor !== undefined) {
+      if (voter.votedFor && this.voteCache[voter.votedFor]) {
+        this.voteCache[voter.votedFor]--;
+        if (this.voteCache[voter.votedFor] === 0) {
+          delete this.voteCache[voter.votedFor];
+        }
+      }
+    }
 
     // 弃票：targetId 为 null
     if (targetId === null) {
@@ -479,6 +489,7 @@ export class Room {
 
     // Record vote
     voter.votedFor = targetId;
+    this.voteCache[targetId] = (this.voteCache[targetId] || 0) + 1;
 
     // Check if all alive players voted
     this.tryResolveVotingIfReady();
@@ -487,19 +498,13 @@ export class Room {
   private resolveVotes() {
     if (!this.gameState) return;
 
-    // Tally votes - 只统计存活玩家的投票（弃票不计入）
-    const votes: Record<string, number> = {};
-    this.players.forEach(p => {
-        if (p.isAlive && p.votedFor) {
-            votes[p.votedFor] = (votes[p.votedFor] || 0) + 1;
-        }
-    });
-    this.gameState.voteResult = votes;
+    // 使用缓存的投票结果
+    this.gameState.voteResult = { ...this.voteCache };
 
     // Find max votes
     let maxVotes = 0;
     let targetIds: string[] = [];
-    Object.entries(votes).forEach(([id, count]) => {
+    Object.entries(this.voteCache).forEach(([id, count]) => {
         if (count > maxVotes) {
             maxVotes = count;
             targetIds = [id];

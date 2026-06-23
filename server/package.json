@@ -4,7 +4,8 @@
   "description": "Who's Spy game server",
   "main": "dist/index.js",
   "scripts": {
-    "start": "node dist/index.js",
+    "start": "node --max-old-space-size=2048 dist/index.js",
+    "start:prod": "NODE_ENV=production node --max-old-space-size=2048 --optimize-for-size dist/index.js",
     "dev": "nodemon src/index.ts",
     "build": "tsc && npm run copy-wordbank",
     "copy-wordbank": "cp -r src/game/wordbank dist/game/"

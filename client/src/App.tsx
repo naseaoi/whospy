@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { SocketProvider, useSocket } from './context/SocketContext';
-import { Home } from './pages/Home';
-import { Lobby } from './pages/Lobby';
-import { GameRoom } from './pages/GameRoom';
+
+const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
+const Lobby = lazy(() => import('./pages/Lobby').then(m => ({ default: m.Lobby })));
+const GameRoom = lazy(() => import('./pages/GameRoom').then(m => ({ default: m.GameRoom })));
 
 const NoticeOverlay: React.FC = () => {
   const { notices } = useSocket();
@@ -25,6 +26,12 @@ const NoticeOverlay: React.FC = () => {
   );
 };
 
+const LoadingFallback: React.FC = () => (
+  <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
+    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+  </div>
+);
+
 const AppContent: React.FC = () => {
   const { room } = useSocket();
 
@@ -36,7 +43,11 @@ const AppContent: React.FC = () => {
                       currentView === 'lobby' ? <Lobby /> :
                       <GameRoom />;
 
-  return <div>{viewContent}</div>;
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      {viewContent}
+    </Suspense>
+  );
 };
 
 function App() {

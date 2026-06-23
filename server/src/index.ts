@@ -25,6 +25,7 @@ const defaultOrigins = [
 ];
 
 const allowedOrigins = configuredOrigins.length > 0 ? configuredOrigins : defaultOrigins;
+const allowedOriginsSet = new Set(allowedOrigins);
 
 const isOriginAllowed = (origin?: string) => {
   if (!origin) {
@@ -33,7 +34,7 @@ const isOriginAllowed = (origin?: string) => {
   if (configuredOrigins.length === 0 && process.env.NODE_ENV === 'production') {
     return true;
   }
-  return allowedOrigins.includes(origin);
+  return allowedOriginsSet.has(origin);
 };
 
 app.use(cors({

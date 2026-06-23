@@ -370,6 +370,18 @@ export class SocketHandler {
       } : null,
     };
 
+    // 预先构建所有玩家的公开数据（非 revealAll 情况下复用）
+    const publicPlayersCache = new Map<string, any>();
+    if (!revealAll) {
+      room.players.forEach(player => {
+        publicPlayersCache.set(player.id, {
+          ...player,
+          role: undefined,
+          word: undefined
+        });
+      });
+    }
+
     roomSockets.forEach((roomSocketId) => {
       const socket = this.io.sockets.sockets.get(roomSocketId);
       if (!socket || !socket.connected) {
@@ -377,16 +389,18 @@ export class SocketHandler {
       }
 
       try {
-        const playersData = room.players.map(player => {
-          if (revealAll || player.id === roomSocketId) {
-            return { ...player };
-          }
-          return {
-            ...player,
-            role: undefined,
-            word: undefined
-          };
-        });
+        let playersData: any[];
+
+        if (revealAll) {
+          playersData = room.players.map(p => ({ ...p }));
+        } else {
+          playersData = room.players.map(player => {
+            if (player.id === roomSocketId) {
+              return { ...player };
+            }
+            return publicPlayersCache.get(player.id)!;
+          });
+        }
 
         socket.emit('room_updated', {
           ...publicData,
