@@ -2,12 +2,14 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import compression from 'compression';
 import path from 'path';
 import { RoomManager } from './game/RoomManager';
 import { TimerService } from './services/TimerService';
 import { SocketHandler } from './handlers/SocketHandler';
 
 const app = express();
+app.use(compression());
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
 const configuredOrigins = (process.env.CORS_ORIGIN || '')
@@ -45,7 +47,11 @@ app.use(cors({
 }));
 
 const clientDistPath = path.join(__dirname, '../../client/dist');
-app.use(express.static(clientDistPath));
+app.use(express.static(clientDistPath, {
+  maxAge: process.env.NODE_ENV === 'production' ? '1y' : 0,
+  etag: true,
+  lastModified: true,
+}));
 
 app.get('/api/health', (req, res) => {
   res.json({

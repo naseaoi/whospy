@@ -1,6 +1,6 @@
 import type { RoomData, GameConfig } from '../types';
 import { io, Socket } from 'socket.io-client';
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from 'react';
 
 const PLAYER_TOKEN_KEY = 'whospy_player_token';
 const LAST_ROOM_ID_KEY = 'whospy_last_room_id';
@@ -67,7 +67,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const filtered = prev.filter(n => !n.expiresAt || n.expiresAt > now);
         return filtered.length !== prev.length ? filtered : prev;
       });
-    }, 500);
+    }, 1000);
 
     return () => {
       if (noticeTimerRef.current) {
@@ -80,8 +80,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Determine socket URL based on environment
     // In production (merged build), use relative path or same origin
     const socketUrl = import.meta.env.PROD ? '/' : 'http://localhost:3001';
-    
-    const newSocket = io(socketUrl);
+
+    const newSocket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionDelay: 1000,
+      timeout: 20000,
+    });
     
     const playerToken = getPlayerToken();
 
@@ -137,56 +141,74 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
-  const createRoom = (name: string, avatar: string) => {
+  const createRoom = useCallback((name: string, avatar: string) => {
     const playerToken = getPlayerToken();
     setNotices([]);
     socket?.emit('create_room', { playerName: name, avatar, playerToken });
-  };
+  }, [socket]);
 
-  const joinRoom = (roomId: string, name: string, avatar: string) => {
+  const joinRoom = useCallback((roomId: string, name: string, avatar: string) => {
     const playerToken = getPlayerToken();
     setNotices([]);
     socket?.emit('join_room', { roomId, playerName: name, avatar, playerToken });
-  };
+  }, [socket]);
 
-  const startGame = () => {
+  const startGame = useCallback(() => {
     socket?.emit('start_game');
-  };
+  }, [socket]);
 
-  const updateConfig = (config: Partial<GameConfig>) => {
+  const updateConfig = useCallback((config: Partial<GameConfig>) => {
     socket?.emit('update_config', { config });
-  };
+  }, [socket]);
 
-  const confirmViewing = () => {
+  const confirmViewing = useCallback(() => {
     socket?.emit('confirm_viewing');
-  };
+  }, [socket]);
 
-  const finishTurn = () => {
+  const finishTurn = useCallback(() => {
     socket?.emit('finish_turn');
-  };
+  }, [socket]);
 
-  const vote = (targetPlayerId: string | null) => {
+  const vote = useCallback((targetPlayerId: string | null) => {
     socket?.emit('vote', { targetPlayerId });
-  };
+  }, [socket]);
 
-  const confirmVoteResult = () => {
+  const confirmVoteResult = useCallback(() => {
     socket?.emit('confirm_vote_result');
-  };
+  }, [socket]);
 
-  const restartGame = () => {
+  const restartGame = useCallback(() => {
     socket?.emit('restart_game');
-  };
+  }, [socket]);
 
-  const leaveRoom = () => {
+  const leaveRoom = useCallback(() => {
     socket?.emit('leave_room');
     removeSessionValue(LAST_ROOM_ID_KEY);
     setRoom(null);
     setError(null);
     setNotices([]);
-  };
+  }, [socket]);
+
+  const value = useMemo(() => ({
+    socket,
+    room,
+    isConnected,
+    createRoom,
+    joinRoom,
+    startGame,
+    updateConfig,
+    confirmViewing,
+    finishTurn,
+    vote,
+    confirmVoteResult,
+    restartGame,
+    leaveRoom,
+    notices,
+    error
+  }), [socket, room, isConnected, createRoom, joinRoom, startGame, updateConfig, confirmViewing, finishTurn, vote, confirmVoteResult, restartGame, leaveRoom, notices, error]);
 
   return (
-    <SocketContext.Provider value={{ socket, room, isConnected, createRoom, joinRoom, startGame, updateConfig, confirmViewing, finishTurn, vote, confirmVoteResult, restartGame, leaveRoom, notices, error }}>
+    <SocketContext.Provider value={value}>
       {children}
     </SocketContext.Provider>
   );

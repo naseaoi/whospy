@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { Modal } from '../components/Modal';
+import { PlayerCard } from '../components/PlayerCard';
 import { Eye, Search, Siren, Mic, Volume2 } from 'lucide-react';
 
 export const GameRoom: React.FC = () => {
@@ -37,85 +38,85 @@ export const GameRoom: React.FC = () => {
   }, [room?.gameState?.phaseEndTime]);
 
   // Calculate vote arrows
-  useEffect(() => {
+  const voteArrowsData = useMemo(() => {
     if (room?.gameState?.phase !== 'VOTING' && room?.gameState?.phase !== 'PK_VOTING') {
-      setVoteArrows([]);
-      return;
+      return [];
     }
 
-    const calculateArrows = () => {
-      const arrows: typeof voteArrows = [];
-      const mutualVotes = new Set<string>();
+    const arrows: typeof voteArrows = [];
+    const mutualVotes = new Set<string>();
 
-      // 检测互投关系
-      room.players.forEach((voter) => {
-        if (!voter.votedFor || voter.votedFor === null) return;
-        const target = room.players.find(p => p.id === voter.votedFor);
-        if (target?.votedFor === voter.id) {
-          const key = [voter.id, voter.votedFor].sort().join('-');
-          mutualVotes.add(key);
+    room.players.forEach((voter) => {
+      if (!voter.votedFor || voter.votedFor === null) return;
+      const target = room.players.find(p => p.id === voter.votedFor);
+      if (target?.votedFor === voter.id) {
+        const key = [voter.id, voter.votedFor].sort().join('-');
+        mutualVotes.add(key);
+      }
+    });
+
+    room.players.forEach((voter) => {
+      if (!voter.votedFor || voter.votedFor === null) return;
+
+      const voterEl = playerCardsRef.current.get(voter.id);
+      const targetEl = playerCardsRef.current.get(voter.votedFor);
+
+      if (!voterEl || !targetEl) return;
+
+      const voterRect = voterEl.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const containerRect = voterEl.parentElement?.getBoundingClientRect();
+
+      if (!containerRect) return;
+
+      const mutualKey = [voter.id, voter.votedFor].sort().join('-');
+      const isMutual = mutualVotes.has(mutualKey);
+
+      let startX = voterRect.left + voterRect.width / 2 - containerRect.left;
+      let startY = voterRect.top + voterRect.height / 2 - containerRect.top;
+      let endX = targetRect.left + targetRect.width / 2 - containerRect.left;
+      let endY = targetRect.top + targetRect.height / 2 - containerRect.top;
+
+      if (isMutual) {
+        const offsetDistance = voter.id < voter.votedFor ? -20 : 20;
+        const [refId1, refId2] = [voter.id, voter.votedFor].sort();
+        const refVoterEl = playerCardsRef.current.get(refId1);
+        const refTargetEl = playerCardsRef.current.get(refId2);
+
+        if (refVoterEl && refTargetEl) {
+          const refVoterRect = refVoterEl.getBoundingClientRect();
+          const refTargetRect = refTargetEl.getBoundingClientRect();
+          const refStartX = refVoterRect.left + refVoterRect.width / 2 - containerRect.left;
+          const refStartY = refVoterRect.top + refVoterRect.height / 2 - containerRect.top;
+          const refEndX = refTargetRect.left + refTargetRect.width / 2 - containerRect.left;
+          const refEndY = refTargetRect.top + refTargetRect.height / 2 - containerRect.top;
+
+          const refAngleRad = Math.atan2(refEndY - refStartY, refEndX - refStartX);
+          const perpAngle = refAngleRad + Math.PI / 2;
+          const offsetX = Math.cos(perpAngle) * offsetDistance;
+          const offsetY = Math.sin(perpAngle) * offsetDistance;
+
+          startX += offsetX;
+          startY += offsetY;
         }
-      });
+      }
 
-      room.players.forEach((voter) => {
-        if (!voter.votedFor || voter.votedFor === null) return;
+      const angle = Math.atan2(endY - startY, endX - startX) * 180 / Math.PI;
+      const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
 
-        const voterEl = playerCardsRef.current.get(voter.id);
-        const targetEl = playerCardsRef.current.get(voter.votedFor);
+      arrows.push({ voterId: voter.id, startX, startY, angle, length });
+    });
 
-        if (!voterEl || !targetEl) return;
-
-        const voterRect = voterEl.getBoundingClientRect();
-        const targetRect = targetEl.getBoundingClientRect();
-        const containerRect = voterEl.parentElement?.getBoundingClientRect();
-
-        if (!containerRect) return;
-
-        const mutualKey = [voter.id, voter.votedFor].sort().join('-');
-        const isMutual = mutualVotes.has(mutualKey);
-
-        let startX = voterRect.left + voterRect.width / 2 - containerRect.left;
-        let startY = voterRect.top + voterRect.height / 2 - containerRect.top;
-        let endX = targetRect.left + targetRect.width / 2 - containerRect.left;
-        let endY = targetRect.top + targetRect.height / 2 - containerRect.top;
-
-        if (isMutual) {
-          const offsetDistance = voter.id < voter.votedFor ? -20 : 20;
-          const [refId1, refId2] = [voter.id, voter.votedFor].sort();
-          const refVoterEl = playerCardsRef.current.get(refId1);
-          const refTargetEl = playerCardsRef.current.get(refId2);
-
-          if (refVoterEl && refTargetEl) {
-            const refVoterRect = refVoterEl.getBoundingClientRect();
-            const refTargetRect = refTargetEl.getBoundingClientRect();
-            const refStartX = refVoterRect.left + refVoterRect.width / 2 - containerRect.left;
-            const refStartY = refVoterRect.top + refVoterRect.height / 2 - containerRect.top;
-            const refEndX = refTargetRect.left + refTargetRect.width / 2 - containerRect.left;
-            const refEndY = refTargetRect.top + refTargetRect.height / 2 - containerRect.top;
-
-            const refAngleRad = Math.atan2(refEndY - refStartY, refEndX - refStartX);
-            const perpAngle = refAngleRad + Math.PI / 2;
-            const offsetX = Math.cos(perpAngle) * offsetDistance;
-            const offsetY = Math.sin(perpAngle) * offsetDistance;
-
-            startX += offsetX;
-            startY += offsetY;
-          }
-        }
-
-        const angle = Math.atan2(endY - startY, endX - startX) * 180 / Math.PI;
-        const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-
-        arrows.push({ voterId: voter.id, startX, startY, angle, length });
-      });
-
-      setVoteArrows(arrows);
-    };
-
-    calculateArrows();
-    const interval = setInterval(calculateArrows, 100);
-    return () => clearInterval(interval);
+    return arrows;
   }, [room?.gameState?.phase, room?.players]);
+
+  useEffect(() => {
+    setVoteArrows(voteArrowsData);
+    const interval = setInterval(() => {
+      setVoteArrows(voteArrowsData);
+    }, 100);
+    return () => clearInterval(interval);
+  }, [voteArrowsData]);
 
   if (!room || !room.gameState) return <div>Loading...</div>;
 
@@ -130,16 +131,24 @@ export const GameRoom: React.FC = () => {
   const isHost = socket?.id === room.hostId;
   const hasConfirmedViewing = room.gameState.viewingConfirmedPlayers?.includes(me?.id || '') || false;
 
-  const handleVoteClick = (targetId: string | null) => {
-      setShowVoteConfirm(targetId);
-  };
+  const handleVoteClick = useCallback((targetId: string | null) => {
+    setShowVoteConfirm(targetId);
+  }, []);
 
-  const confirmVote = () => {
-      if (showVoteConfirm !== undefined) {
-          vote(showVoteConfirm);
-          setShowVoteConfirm(undefined);
-      }
-  };
+  const confirmVote = useCallback(() => {
+    if (showVoteConfirm !== undefined) {
+      vote(showVoteConfirm);
+      setShowVoteConfirm(undefined);
+    }
+  }, [showVoteConfirm, vote]);
+
+  const handlePlayerRefSet = useCallback((id: string, el: HTMLDivElement | null) => {
+    if (el) {
+      playerCardsRef.current.set(id, el);
+    } else {
+      playerCardsRef.current.delete(id);
+    }
+  }, []);
 
   const targetPlayerName = showVoteConfirm ? room.players.find(p => p.id === showVoteConfirm)?.name : null;
 
@@ -368,80 +377,36 @@ export const GameRoom: React.FC = () => {
           const isCurrent = p.id === room.gameState?.currentTurnPlayerId;
           const isMe = p.id === me?.id;
           const hasNotVoted = me?.votedFor === undefined;
-          const isVotable = (
+          const isVotable = Boolean(
             ((phase === 'VOTING' && p.isAlive) ||
              (phase === 'PK_VOTING' && room.gameState?.pkPlayers?.includes(p.id) && p.isAlive)) &&
             hasNotVoted &&
             me?.isAlive &&
             p.id !== me?.id
           );
-          const hasConfirmed = (phase === 'VIEWING' || phase === 'DISTRIBUTING') && room.gameState?.viewingConfirmedPlayers?.includes(p.id);
+          const hasConfirmed = (phase === 'VIEWING' || phase === 'DISTRIBUTING') && (room.gameState?.viewingConfirmedPlayers?.includes(p.id) ?? false);
           const hasVoted = phase === 'VOTING' && p.votedFor !== undefined && p.votedFor !== null;
           const hasAbstained = phase === 'VOTING' && p.votedFor === null;
+          const isPkPlayer = (phase === 'PK_DESCRIBING' || phase === 'PK_VOTING') && (room.gameState?.pkPlayers?.includes(p.id) ?? false);
+          const isPkPhase = phase === 'PK_DESCRIBING' || phase === 'PK_VOTING';
 
           return (
-            <div
-                key={p.id}
-                ref={(el) => {
-                  if (el) {
-                    playerCardsRef.current.set(p.id, el);
-                  } else {
-                    playerCardsRef.current.delete(p.id);
-                  }
-                }}
-                className={`
-                    relative p-3 rounded-xl flex items-center space-x-3 transition-all duration-300 border overflow-visible
-                    ${!p.isAlive
-                        ? 'bg-gray-800/30 border-gray-800 opacity-60 grayscale'
-                        : isCurrent
-                            ? 'bg-gray-700/80 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.2)] scale-102'
-                            : hasConfirmed
-                                ? 'bg-gray-800 border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]'
-                                : hasVoted
-                                    ? 'bg-gray-800 border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]'
-                                    : hasAbstained
-                                        ? 'bg-gray-800 border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]'
-                                        : 'bg-gray-800 border-gray-700/50 hover:bg-gray-750'}
-                    ${isVotable ? 'cursor-pointer hover:bg-red-900/20 hover:scale-105' : ''}
-                    ${isMe ? 'ring-1 ring-blue-500/30 bg-blue-900/10' : ''}
-                    ${(phase === 'PK_DESCRIBING' || phase === 'PK_VOTING') && room.gameState?.pkPlayers?.includes(p.id) ? 'border-orange-500/50 shadow-[0_0_10px_rgba(249,115,22,0.3)]' : ((phase === 'PK_DESCRIBING' || phase === 'PK_VOTING') ? 'opacity-60' : '')}
-                `}
-                onClick={() => isVotable && handleVoteClick(p.id)}
-            >
-                {/* Seat Number Badge */}
-                <div className="absolute -top-2 -left-2 w-5 h-5 flex items-center justify-center bg-gray-900 rounded-full text-[10px] font-mono text-gray-500 border border-gray-700 shadow-md z-30">
-                    {index + 1}
-                </div>
-
-                {/* Status Badges */}
-                {isMe && <div className="absolute -bottom-1.5 -right-1 bg-blue-600 text-[8px] px-1.5 py-0 rounded-full shadow border border-blue-400 z-30 font-bold tracking-tighter">YOU</div>}
-                
-                {/* PK Badge */}
-                {room.gameState?.pkPlayers?.includes(p.id) && (phase === 'PK_DESCRIBING' || phase === 'PK_VOTING' || phase === 'VOTE_RESULT') && (
-                    <div className="absolute -top-2 -right-1 bg-orange-600 text-[9px] px-1.5 py-0.5 rounded shadow z-30 font-bold animate-pulse">PK</div>
-                )}
-                <div className="relative">
-                    <div className="text-3xl filter drop-shadow-sm">{p.avatar}</div>
-                    {!p.isAlive && (
-                        <div className="absolute inset-[-8px] flex items-center justify-center z-20 pointer-events-none">
-                             <span className="text-red-500 font-bold text-lg transform -rotate-12 border-4 border-red-500 px-1 rounded bg-black/60 shadow-lg backdrop-blur-sm">OUT</span>
-                        </div>
-                    )}
-                </div>
-                <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm truncate text-gray-200">{p.name}</div>
-                    <div className="flex items-center space-x-1 mt-1">
-                        {p.isOnline ? (
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_5px_rgba(34,197,94,0.8)]"></div>
-                        ) : (
-                            <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
-                        )}
-                        {isCurrent && <span className="text-[10px] text-yellow-400 animate-pulse">发言中</span>}
-                        {phase === 'VOTING' && p.votedFor === null && <span className="text-[10px] text-gray-400">弃票</span>}
-                        {phase === 'VOTING' && p.votedFor !== undefined && p.votedFor !== null && <span className="text-[10px] text-green-400">已投</span>}
-                    </div>
-                </div>
-            </div>
+            <PlayerCard
+              key={p.id}
+              player={p}
+              index={index}
+              isMe={isMe}
+              isCurrent={isCurrent}
+              isVotable={isVotable}
+              hasConfirmed={hasConfirmed}
+              hasVoted={hasVoted}
+              hasAbstained={hasAbstained}
+              isPkPlayer={isPkPlayer}
+              isPkPhase={isPkPhase}
+              phase={phase}
+              onVoteClick={handleVoteClick}
+              onRefSet={handlePlayerRefSet}
+            />
           );
         })}
         </div>

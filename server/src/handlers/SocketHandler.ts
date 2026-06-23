@@ -358,6 +358,18 @@ export class SocketHandler {
       return;
     }
 
+    const revealAll = room.status === 'GAME_OVER' || room.gameState?.phase === 'GAME_OVER';
+    const publicData = {
+      id: room.id,
+      hostId: room.hostId,
+      status: room.status,
+      config: room.config,
+      gameState: room.gameState ? {
+        ...room.gameState,
+        words: revealAll ? room.gameState.words : { civilian: '', spy: '' }
+      } : null,
+    };
+
     roomSockets.forEach((roomSocketId) => {
       const socket = this.io.sockets.sockets.get(roomSocketId);
       if (!socket || !socket.connected) {
@@ -365,7 +377,21 @@ export class SocketHandler {
       }
 
       try {
-        socket.emit('room_updated', room.toDataForPlayer(roomSocketId));
+        const playersData = room.players.map(player => {
+          if (revealAll || player.id === roomSocketId) {
+            return { ...player };
+          }
+          return {
+            ...player,
+            role: undefined,
+            word: undefined
+          };
+        });
+
+        socket.emit('room_updated', {
+          ...publicData,
+          players: playersData
+        });
       } catch (error) {
         console.error(`Failed to emit room_updated to ${roomSocketId}:`, error);
       }

@@ -16,11 +16,13 @@ export class Room {
   
   private words: WordPair | null = null;
   private timer: NodeJS.Timeout | null = null;
-  private turnOrder: string[] = []; // Array of player IDs
+  private turnOrder: string[] = [];
   private currentTurnIndex: number = 0;
-  private initialPlayerCount: number = 0; // 游戏开始时的玩家数，用于胜利阈值计算
+  private initialPlayerCount: number = 0;
   private tokenToPlayerId: Map<string, string> = new Map();
   private playerIdToToken: Map<string, string> = new Map();
+  private playersMap: Map<string, Player> = new Map();
+  private pendingUpdate: NodeJS.Timeout | null = null;
 
   // Callback to emit updates to room
   private onUpdate: (roomId: string) => void;
@@ -46,6 +48,7 @@ export class Room {
       isReady: false
     };
     this.players.push(player);
+    this.playersMap.set(id, player);
     this.tokenToPlayerId.set(token, id);
     this.playerIdToToken.set(id, token);
     return player;
@@ -57,6 +60,8 @@ export class Room {
       this.playerIdToToken.delete(id);
       this.tokenToPlayerId.delete(token);
     }
+
+    this.playersMap.delete(id);
 
     const phase = this.gameState?.phase;
     const wasCurrentTurn = this.gameState?.currentTurnPlayerId === id;
@@ -122,7 +127,7 @@ export class Room {
       this.clearTimer();
       this.status = 'GAME_OVER';
       this.gameState!.phase = 'GAME_OVER';
-      this.onUpdate(this.id);
+      this.emitUpdate();
       return;
     }
 
@@ -137,7 +142,7 @@ export class Room {
       if (lastAlive) {
         this.gameState!.winner = lastAlive.role === 'SPY' ? 'SPY' : (lastAlive.role === 'BLANK' ? 'BLANK' : 'CIVILIAN');
       }
-      this.onUpdate(this.id);
+      this.emitUpdate();
       return;
     }
 
@@ -151,7 +156,7 @@ export class Room {
           this.gameState!.pkPlayers = undefined;
           this.gameState!.phase = 'VOTE_RESULT';
           this.gameState!.voteResultConfirmedPlayers = [];
-          this.onUpdate(this.id);
+          this.emitUpdate();
           break;
         }
         // 当前发言者被移除 → 清除定时器，立即推进到下一个回合
@@ -169,7 +174,7 @@ export class Room {
           this.gameState!.pkPlayers = undefined;
           this.gameState!.phase = 'VOTE_RESULT';
           this.gameState!.voteResultConfirmedPlayers = [];
-          this.onUpdate(this.id);
+          this.emitUpdate();
           break;
         }
         // 投票阶段有票被清除，重新检查是否所有在线存活玩家都已投票
@@ -188,7 +193,7 @@ export class Room {
           this.gameState!.pkPlayers = undefined;
           this.gameState!.phase = 'VOTE_RESULT';
           this.gameState!.voteResultConfirmedPlayers = [];
-          this.onUpdate(this.id);
+          this.emitUpdate();
         }
         break;
 
@@ -199,7 +204,7 @@ export class Room {
   }
 
   getPlayer(id: string) {
-    return this.players.find(p => p.id === id);
+    return this.playersMap.get(id);
   }
 
   getPlayerToken(playerId: string) {
@@ -249,6 +254,8 @@ export class Room {
     player.id = newPlayerId;
     player.isOnline = true;
 
+    this.playersMap.delete(oldPlayerId);
+    this.playersMap.set(newPlayerId, player);
     this.playerIdToToken.delete(oldPlayerId);
     this.playerIdToToken.set(newPlayerId, token);
     this.tokenToPlayerId.set(token, newPlayerId);
@@ -379,7 +386,7 @@ export class Room {
     this.gameState.phaseEndTime = undefined;
     this.gameState.viewingConfirmedPlayers = [];
 
-    this.onUpdate(this.id);
+    this.emitUpdate();
     this.clearTimer();
   }
 
@@ -407,7 +414,7 @@ export class Room {
 
     const alivePlayers = this.players.filter(player => player.isAlive && player.isOnline);
     if (alivePlayers.length === 0) {
-      this.onUpdate(this.id);
+      this.emitUpdate();
       return;
     }
 
@@ -421,7 +428,7 @@ export class Room {
       return;
     }
 
-    this.onUpdate(this.id);
+    this.emitUpdate();
   }
 
   private startDescribingPhase() {
@@ -445,7 +452,7 @@ export class Room {
       p.votedFor = undefined;
     });
 
-    this.onUpdate(this.id);
+    this.emitUpdate();
     this.clearTimer();
   }
 
@@ -552,7 +559,7 @@ export class Room {
             this.gameState.voteResultConfirmedPlayers = [];
             const announcementDuration = 5000;
             this.gameState.phaseEndTime = Date.now() + announcementDuration;
-            this.onUpdate(this.id);
+            this.emitUpdate();
 
             // Auto transition to PK_DESCRIBING
             this.clearTimer();
@@ -564,7 +571,7 @@ export class Room {
                 // Filter turnOrder to only include PK players
                 this.turnOrder = this.players.map(p => p.id).filter(id => this.gameState!.pkPlayers!.includes(id));
 
-                this.onUpdate(this.id);
+                this.emitUpdate();
                 this.startTurn();
             }, announcementDuration);
 
@@ -572,7 +579,7 @@ export class Room {
         }
     }
 
-    this.onUpdate(this.id);
+    this.emitUpdate();
   }
 
   confirmVoteResult(playerId: string) {
@@ -641,7 +648,7 @@ export class Room {
           this.gameState.phase = 'PK_VOTING';
           this.players.forEach(p => p.votedFor = undefined);
           this.gameState.voteResult = {};
-          this.onUpdate(this.id);
+          this.emitUpdate();
           this.clearTimer();
       } else {
           this.startVotingPhase();
@@ -653,7 +660,7 @@ export class Room {
     this.gameState.currentTurnPlayerId = currentPlayerId;
     this.gameState.phaseEndTime = undefined;
 
-    this.onUpdate(this.id);
+    this.emitUpdate();
     this.clearTimer();
   }
 
@@ -669,7 +676,7 @@ export class Room {
         p.votedFor = undefined;
         p.isAlive = true;
     });
-    this.onUpdate(this.id);
+    this.emitUpdate();
   }
 
   private checkWinCondition(): boolean {
@@ -735,7 +742,7 @@ export class Room {
 
     const votingParticipants = this.getVotingParticipants();
     if (votingParticipants.length === 0) {
-      this.onUpdate(this.id);
+      this.emitUpdate();
       return;
     }
 
@@ -745,7 +752,7 @@ export class Room {
       return;
     }
 
-    this.onUpdate(this.id);
+    this.emitUpdate();
   }
 
   private tryAdvanceVoteResultIfReady() {
@@ -755,7 +762,7 @@ export class Room {
 
     const votingParticipants = this.getVotingParticipants();
     if (votingParticipants.length === 0) {
-      this.onUpdate(this.id);
+      this.emitUpdate();
       return;
     }
 
@@ -771,11 +778,35 @@ export class Room {
       return;
     }
 
-    this.onUpdate(this.id);
+    this.emitUpdate();
   }
 
   dispose() {
     this.clearTimer();
+    this.clearPendingUpdate();
+  }
+
+  private clearPendingUpdate() {
+    if (this.pendingUpdate) {
+      clearTimeout(this.pendingUpdate);
+      this.pendingUpdate = null;
+    }
+  }
+
+  private scheduleUpdate() {
+    if (this.pendingUpdate) {
+      return;
+    }
+
+    this.pendingUpdate = setTimeout(() => {
+      this.pendingUpdate = null;
+      this.emitUpdate();
+    }, 0);
+  }
+
+  private emitUpdate() {
+    this.clearPendingUpdate();
+    this.scheduleUpdate();
   }
 
   /** Fisher-Yates 原地洗牌，保证均匀随机分布 */
