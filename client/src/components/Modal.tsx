@@ -9,20 +9,22 @@ interface ModalProps {
   confirmText?: string;
   cancelText?: string;
   type?: 'alert' | 'confirm';
+  disableBackdropClick?: boolean;
 }
 
-export const Modal: React.FC<ModalProps> = ({ 
-  isOpen, onClose, onConfirm, title, children, 
-  confirmText = "确定", cancelText = "取消", type = 'alert' 
+export const Modal: React.FC<ModalProps> = ({
+  isOpen, onClose, onConfirm, title, children,
+  confirmText = "确定", cancelText = "取消", type = 'alert',
+  disableBackdropClick = false
 }) => {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
+        onClick={disableBackdropClick ? undefined : onClose}
       ></div>
       
       {/* Content */}

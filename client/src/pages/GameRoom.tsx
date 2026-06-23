@@ -537,6 +537,7 @@ export const GameRoom: React.FC = () => {
         type="confirm"
         confirmText={isHost ? "再来一局" : (hasClickedRestart ? "等待房主" : "再来一局")}
         cancelText="退出房间"
+        disableBackdropClick={true}
         onConfirm={() => {
           if (isHost) {
             restartGame();
