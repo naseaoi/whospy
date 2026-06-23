@@ -3,6 +3,7 @@ import { useSocket } from '../context/SocketContext';
 import { generateRandomAvatar, generateRandomName } from '../utils/random';
 import { Modal } from '../components/Modal';
 import { Dices } from 'lucide-react';
+import packageJson from '../../package.json';
 
 export const Home: React.FC = () => {
   const { createRoom, joinRoom, error, isConnected } = useSocket();
@@ -182,7 +183,7 @@ export const Home: React.FC = () => {
       </div>
       
       <div className="mt-8 text-gray-600 text-xs font-mono opacity-50">
-         v1.1.0
+         v{packageJson.version}
       </div>
     </div>
   );
