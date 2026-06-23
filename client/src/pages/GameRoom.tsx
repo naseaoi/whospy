@@ -20,6 +20,7 @@ export const GameRoom: React.FC = () => {
   // Modal States
   const [showVoteConfirm, setShowVoteConfirm] = useState<string | null | undefined>(undefined);
   const [showWordModal, setShowWordModal] = useState(false);
+  const [hasClickedRestart, setHasClickedRestart] = useState(false);
 
   // Sync timer
   useEffect(() => {
@@ -36,6 +37,13 @@ export const GameRoom: React.FC = () => {
     }, 100); // Update more frequently for smoother animation
     return () => clearInterval(interval);
   }, [room?.gameState?.phaseEndTime]);
+
+  // Reset restart click state when game restarts
+  useEffect(() => {
+    if (room?.status === 'WAITING') {
+      setHasClickedRestart(false);
+    }
+  }, [room?.status]);
 
   // Calculate vote arrows
   const voteArrowsData = useMemo(() => {
@@ -527,9 +535,15 @@ export const GameRoom: React.FC = () => {
         isOpen={phase === 'GAME_OVER'}
         title="游戏结束"
         type="confirm"
-        confirmText={isHost ? "再来一局" : "等待房主"}
-        cancelText="返回大厅"
-        onConfirm={() => isHost && restartGame()}
+        confirmText={isHost ? "再来一局" : (hasClickedRestart ? "等待房主" : "再来一局")}
+        cancelText="退出房间"
+        onConfirm={() => {
+          if (isHost) {
+            restartGame();
+          } else {
+            setHasClickedRestart(true);
+          }
+        }}
         onClose={leaveRoom}
       >
           <div className="text-center py-4">
